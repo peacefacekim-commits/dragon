@@ -1,16 +1,17 @@
 """단일 HTML 보고서 생성.
 
+양식이 만들어 낸 블록 목록을 그대로 그린다. 어떤 분석인지는 알지 못하고,
+블록의 서식·차트 지정만 보고 렌더링한다.
+
 외부 CSS/JS/폰트를 전혀 참조하지 않는다. 파일 하나만 있으면 인터넷이
 끊긴 PC 에서도 열리고, 그대로 인쇄하거나 메일로 넘길 수 있다.
 """
 
 from __future__ import annotations
 
-import datetime as _dt
-
 from . import charts
-from .analysis import AnalysisResult
-from .table import Table, format_number, format_percent, to_number
+from .engine import BlockResult, Report
+from .table import format_number, format_percent, to_number
 
 __all__ = ["render_report", "write_report"]
 
@@ -156,6 +157,7 @@ tbody tr.total-row td { font-weight: 650; border-top: 2px solid var(--border); }
 
 ul.notes { margin: 0; padding-left: 18px; color: var(--text-2); font-size: 13px; }
 ul.notes li { margin-bottom: 4px; }
+ul.notes.block { margin-top: 14px; }
 footer.doc { color: var(--text-3); font-size: 12px; text-align: center; margin-top: 26px; }
 
 @media print {
@@ -165,7 +167,12 @@ footer.doc { color: var(--text-3); font-size: 12px; text-align: center; margin-t
 }
 """
 
-_STATUS_CLASS = {"초과": "over", "부진": "under", "정상": "normal"}
+# 상태 문구를 색으로 옮기는 규칙. 양식마다 문구가 다르므로 키워드로 판단한다.
+_STATUS_KEYWORDS = (
+    (("초과", "위험", "심각", "미납", "오류"), "over"),
+    (("부진", "주의", "지연", "미달", "경고"), "under"),
+    (("정상", "양호", "완료", "적정"), "normal"),
+)
 
 
 def _escape(value: object) -> str:
@@ -178,27 +185,50 @@ def _escape(value: object) -> str:
     )
 
 
-def _is_percent_column(name: str) -> bool:
-    return any(token in name for token in ("구성비", "집행률", "전기대비", "비율", "%"))
+def status_class(value: object) -> str:
+    """상태 문구에 맞는 CSS 클래스. 색만으로 뜻을 전하지 않도록 문구는 항상 함께 쓴다."""
+    text = str(value)
+    for keywords, css in _STATUS_KEYWORDS:
+        if any(keyword in text for keyword in keywords):
+            return css
+    return "unknown"
 
 
-def _format_cell(column: str, value: object) -> tuple[str, bool]:
-    """(표시 문자열, 우측정렬 여부)."""
-    if column == "상태":
-        css = _STATUS_CLASS.get(str(value), "unknown")
-        return f'<span class="pill {css}">{_escape(value)}</span>', False
+def _looks_like_percent(column: str) -> bool:
+    return any(token in column for token in ("구성비", "집행률", "증감", "비율", "율", "률", "%"))
+
+
+def format_value(value: object, kind: str = "자동", column: str = "") -> tuple[str, bool]:
+    """(표시 문자열, 우측정렬 여부). ``kind`` 는 양식이 지정한 서식."""
+    if kind == "문자":
+        return _escape("" if value is None else value), False
+    if kind == "상태":
+        return f'<span class="pill {status_class(value)}">{_escape(value)}</span>', False
 
     number = to_number(value)
     if number is None:
         return _escape("" if value is None else value), False
-    if _is_percent_column(column):
+
+    if kind == "비율":
+        return _escape(format_percent(number)), True
+    if kind == "금액" or kind == "정수":
+        return _escape(format_number(number)), True
+    if kind == "소수":
+        return _escape(format_number(number, 2)), True
+
+    # 자동: 컬럼 이름이 비율처럼 생겼으면 퍼센트로, 아니면 자릿수를 보고 정한다.
+    if _looks_like_percent(column):
         return _escape(format_percent(number)), True
     decimals = 0 if abs(number - round(number)) < 1e-9 else 2
     return _escape(format_number(number, decimals)), True
 
 
-def _render_table(table: Table, limit: int = 200, with_total: bool = True) -> str:
-    """표를 HTML 로. 차트가 못 보여주는 값은 여기서 전부 확인할 수 있다."""
+def _render_table(block: BlockResult, limit: int = 200) -> str:
+    """블록의 표를 HTML 로. 차트가 못 보여주는 값은 여기서 전부 확인할 수 있다."""
+    table = block.표
+    if not len(table):
+        return ""
+
     rows = table.rows[:limit]
     head = "".join(f"<th>{_escape(c)}</th>" for c in table.columns)
 
@@ -206,30 +236,19 @@ def _render_table(table: Table, limit: int = 200, with_total: bool = True) -> st
     for row in rows:
         cells = []
         for column, value in zip(table.columns, row):
-            text, numeric = _format_cell(column, value)
+            text, numeric = format_value(value, block.서식.get(column, "자동"), column)
             cells.append(f'<td class="num">{text}</td>' if numeric else f"<td>{text}</td>")
         body_parts.append("<tr>" + "".join(cells) + "</tr>")
 
-    if with_total and len(table):
-        total_cells = []
-        for index, column in enumerate(table.columns):
-            if index == 0:
-                total_cells.append("<td>합계</td>")
-                continue
-            if column in ("상태",) or _is_percent_column(column):
-                total_cells.append("<td></td>")
-                continue
-            numbers = [to_number(row[index]) for row in table.rows]
-            if all(n is None for n in numbers):
-                total_cells.append("<td></td>")
-                continue
-            total = sum(n for n in numbers if n is not None)
-            total_cells.append(f'<td class="num">{_escape(format_number(total))}</td>')
-        body_parts.append('<tr class="total-row">' + "".join(total_cells) + "</tr>")
+    if block.합계표시:
+        body_parts.append(_total_row(block))
 
     note = ""
     if len(table) > limit:
-        note = f'<p class="sub">전체 {len(table):,}행 중 상위 {limit:,}행만 표시 (전체는 엑셀 파일 참조)</p>'
+        note = (
+            f'<p class="sub">전체 {len(table):,}행 중 상위 {limit:,}행만 표시 '
+            "(전체는 엑셀 내보내기 참조)</p>"
+        )
 
     return (
         '<div class="table-scroll"><table>'
@@ -238,142 +257,163 @@ def _render_table(table: Table, limit: int = 200, with_total: bool = True) -> st
     )
 
 
-def _tiles(result: AnalysisResult) -> str:
-    tiles: list[str] = []
+def _total_row(block: BlockResult) -> str:
+    """합산이 말이 되는 컬럼만 더한다.
 
-    def tile(label: str, figure: str, note: str = "", unit: str = "") -> str:
+    평균·비율·상태를 세로로 더하면 뜻이 없으므로, 양식이 합계·건수로 집계한
+    측정값과 금액·정수 계산 컬럼만 더한다.
+    """
+    table = block.표
+    cells = []
+    for index, column in enumerate(table.columns):
+        if index == 0:
+            cells.append("<td>합계</td>")
+            continue
+
+        if column not in block.합산가능:
+            cells.append("<td></td>")
+            continue
+
+        numbers = [to_number(row[index]) for row in table.rows]
+        if all(n is None for n in numbers):
+            cells.append("<td></td>")
+            continue
+        total = sum(n for n in numbers if n is not None)
+        cells.append(f'<td class="num">{_escape(format_number(total))}</td>')
+    return '<tr class="total-row">' + "".join(cells) + "</tr>"
+
+
+def _tiles(report: Report) -> str:
+    if not report.tiles:
+        return ""
+
+    parts = []
+    for tile in report.tiles:
+        text, _ = format_value(tile.값, tile.서식, tile.이름)
         # 단위는 숫자 옆이 아니라 라벨에 붙인다. 억 단위 금액은 숫자만으로도
         # 줄을 꽉 채워서, 단위를 옆에 두면 혼자 다음 줄로 넘어간다.
-        heading = f"{label} ({unit})" if unit else label
+        note = tile.설명
+        heading = tile.이름
+        if note and len(note) <= 3:  # "원", "건", "개" 같은 단위
+            heading, note = f"{tile.이름} ({note})", ""
         note_html = f'<div class="note">{_escape(note)}</div>' if note else ""
-        return (
+        parts.append(
             f'<div class="tile"><div class="label">{_escape(heading)}</div>'
-            f'<div class="figure">{_escape(figure)}</div>{note_html}</div>'
+            f'<div class="figure">{text}</div>{note_html}</div>'
+        )
+    return f'<div class="tiles">{"".join(parts)}</div>'
+
+
+# ── 차트 선택 ──────────────────────────────────────────────────────
+
+
+def _column_of_format(block: BlockResult, kind: str) -> str | None:
+    for column in block.표.columns:
+        if block.서식.get(column) == kind:
+            return column
+    return None
+
+
+def _label_column(block: BlockResult) -> str:
+    """막대 차트의 세로축이 무엇인지 나타내는 이름."""
+    return " · ".join(block.기준이름) or (block.표.columns[0] if block.표.columns else "")
+
+
+def _bar_labels(block: BlockResult) -> list[str]:
+    """기준 컬럼이 여러 개면 값을 이어 붙여 한 줄 라벨로 만든다."""
+    key_count = max(1, len(block.기준이름))
+    return [
+        " · ".join(str(cell) for cell in row[:key_count] if str(cell).strip())
+        for row in block.표.rows
+    ]
+
+
+def _render_chart(block: BlockResult) -> str:
+    table = block.표
+    if block.차트 == "없음" or not len(table):
+        return ""
+
+    if block.차트 == "선":
+        return _render_line_chart(block)
+    return _render_bar_chart(block)
+
+
+def _render_bar_chart(block: BlockResult) -> str:
+    table = block.표
+    value_column = block.차트값 or (block.측정값이름[0] if block.측정값이름 else "")
+    if value_column not in table.columns:
+        numeric = [c for c in table.columns[1:] if any(to_number(v) is not None for v in table.column(c))]
+        if not numeric:
+            return charts.empty_chart("그래프로 그릴 숫자 컬럼이 없습니다.")
+        value_column = numeric[0]
+
+    labels = _bar_labels(block)
+    top = 15
+    labels, rows = labels[:top], table.rows[:top]
+    values_index = table.index_of(value_column)
+
+    # 비율 컬럼을 상태 컬럼과 함께 그리면 집행률 형태의 그래프가 된다.
+    status_column = _column_of_format(block, "상태")
+    is_ratio = block.서식.get(value_column) == "비율" or _looks_like_percent(value_column)
+    if status_column and is_ratio:
+        status_index = table.index_of(status_column)
+        return charts.execution_chart(
+            labels,
+            [to_number(row[values_index]) for row in rows],
+            [str(row[status_index]) for row in rows],
+            status_class=status_class,
         )
 
-    budget = result.totals.get("예산액")
-    actual = result.totals.get("집행액")
-    amount = result.totals.get("금액")
+    share_column = next(
+        (c for c in table.columns if block.서식.get(c) == "비율" or "구성비" in c), None
+    )
+    shares = None
+    if share_column and share_column != value_column:
+        share_index = table.index_of(share_column)
+        shares = [to_number(row[share_index]) for row in rows]
 
-    if budget is not None:
-        tiles.append(tile("총 예산액", format_number(budget), unit="원"))
-    if actual is not None:
-        tiles.append(tile("총 집행액", format_number(actual), unit="원"))
-    if budget is not None and actual is not None:
-        remaining = budget - actual
-        rate = result.execution_rate
-        tiles.append(
-            tile(
-                "잔액",
-                format_number(remaining),
-                note="예산 초과" if remaining < 0 else "미집행 잔액",
-                unit="원",
-            )
-        )
-        tiles.append(
-            tile(
-                "전체 집행률",
-                format_percent(rate) if rate is not None else "-",
-                note="예산 대비 집행액",
-            )
-        )
-    elif amount is not None:
-        tiles.append(tile("총 금액", format_number(amount), unit="원"))
-
-    tiles.append(tile("분석 행 수", f"{result.row_count:,}", note=f"시트: {result.sheet}", unit="건"))
-    return f'<div class="tiles">{"".join(tiles)}</div>'
+    return charts.bar_chart(
+        labels,
+        [to_number(row[values_index]) or 0.0 for row in rows],
+        title=f"{_label_column(block)}별 {value_column}",
+        shares=shares,
+    )
 
 
-def _breakdown_section(result: AnalysisResult) -> str:
-    table = result.breakdown
-    category = result.mapping.category or "항목"
-    value_column = result.mapping.value_column or ""
-
-    if table is None or not len(table):
-        chart = charts.empty_chart("항목별 집계를 만들 수 없습니다.")
-        body = ""
+def _line_series(block: BlockResult) -> list[tuple[str, list[float | None]]]:
+    table = block.표
+    if block.차트값 and block.차트값 in table.columns:
+        names = [block.차트값]
     else:
-        top = Table(table.columns, table.rows[:15], table.name)
-        chart = charts.bar_chart(
-            [str(row[0]) for row in top.rows],
-            [to_number(row[top.index_of(value_column)]) or 0.0 for row in top.rows],
-            title=f"{category}별 {value_column}",
-            shares=[to_number(row[top.index_of("구성비")]) for row in top.rows],
-        )
-        body = _render_table(table)
+        names = [n for n in block.측정값이름 if n in table.columns][:2]
+    if not names:
+        names = [
+            c
+            for c in table.columns[1:]
+            if c != "건수" and any(to_number(v) is not None for v in table.column(c))
+        ][:1]
 
-    return (
-        '<section class="card"><h2>1. 항목별 집계 · 구성비</h2>'
-        f'<p class="sub">{_escape(category)} 기준 {_escape(value_column)} 합계와 전체 대비 비중 '
-        "(금액 큰 순, 상위 15개 그래프)</p>"
-        f'<div class="chart-scroll">{chart}</div>{body}</section>'
-    )
+    series = [(name, [to_number(v) for v in table.column(name)]) for name in names]
 
-
-def _execution_section(result: AnalysisResult) -> str:
-    table = result.execution
-    if table is None or not len(table):
-        reason = "예산액·집행액 컬럼이 모두 있어야 계산할 수 있습니다."
-        return (
-            '<section class="card"><h2>2. 예산 대비 집행률</h2>'
-            f'<p class="sub">{_escape(reason)}</p>'
-            f'<div class="chart-scroll">{charts.empty_chart(reason)}</div></section>'
-        )
-
-    top = Table(table.columns, table.rows[:15], table.name)
-    chart = charts.execution_chart(
-        [str(row[0]) for row in top.rows],
-        [to_number(row[top.index_of("집행률")]) for row in top.rows],
-        [str(row[top.index_of("상태")]) for row in top.rows],
-    )
-    legend = (
-        '<div class="legend">'
-        f'<span><span class="pill normal">정상</span> 집행률 70% 이상 100% 이하</span>'
-        f'<span><span class="pill under">부진</span> 70% 미만</span>'
-        f'<span><span class="pill over">초과</span> 100% 초과</span>'
-        "</div>"
-    )
-    return (
-        '<section class="card"><h2>2. 예산 대비 집행률</h2>'
-        '<p class="sub">예산액 큰 순 상위 15개. 100% 눈금이 목표선입니다.</p>'
-        f"{legend}<div class=\"chart-scroll\">{chart}</div>{_render_table(table)}</section>"
-    )
-
-
-def _trend_section(result: AnalysisResult) -> str:
-    table = result.trend
-    grain_label = {"month": "월별", "quarter": "분기별", "year": "연도별"}.get(result.grain, "기간별")
-
-    if table is None or not len(table):
-        reason = "일자/기간 컬럼을 찾지 못해 추이를 그릴 수 없습니다."
-        return (
-            f'<section class="card"><h2>3. {_escape(grain_label)} 추이</h2>'
-            f'<p class="sub">{_escape(reason)}</p>'
-            f'<div class="chart-scroll">{charts.empty_chart(reason)}</div></section>'
-        )
-
-    periods = [str(row[0]) for row in table.rows]
-    measures = [
-        column
-        for column in table.columns[1:]
-        if column not in ("건수", "전기대비") and not column.startswith("누적")
-    ]
-    series = [
-        (column, [to_number(row[table.index_of(column)]) for row in table.rows])
-        for column in measures[:2]
-    ]
     # 예산액을 연초에 한 번만 계상하는 양식이면 기간별 예산 계열은 대부분 0 이라
     # 그래프가 '예산이 급감한 것처럼' 읽힌다. 그런 계열은 표에만 남긴다.
     if len(series) > 1:
         meaningful = [
             (name, values)
             for name, values in series
-            if sum(1 for v in values if v) >= max(2, len(periods) * 0.6)
+            if sum(1 for v in values if v) >= max(2, len(table.rows) * 0.6)
         ]
         if meaningful:
             series = meaningful
+    return series
 
-    chart = charts.line_chart(periods, series)
+
+def _render_line_chart(block: BlockResult) -> str:
+    table = block.표
+    periods = [str(row[0]) for row in table.rows]
+    series = _line_series(block)
+    if not series:
+        return charts.empty_chart("그래프로 그릴 숫자 컬럼이 없습니다.")
 
     legend = ""
     if len(series) >= 2:
@@ -383,30 +423,54 @@ def _trend_section(result: AnalysisResult) -> str:
             f'<span><i class="s2"></i>{_escape(series[1][0])}</span>'
             "</div>"
         )
+    return legend + charts.line_chart(periods, series)
 
-    plotted = " · ".join(name for name, _ in series)
+
+# ── 섹션 ───────────────────────────────────────────────────────────
+
+
+def _render_block(block: BlockResult, number: int) -> str:
+    chart = _render_chart(block)
+    chart_html = f'<div class="chart-scroll">{chart}</div>' if chart.startswith("<svg") else chart
+    subtitle = f'<p class="sub">{_escape(block.설명)}</p>' if block.설명 else ""
+
+    body = _render_table(block)
+    if not len(block.표):
+        body = '<p class="sub">표시할 데이터가 없습니다.</p>'
+
+    notes = ""
+    if block.경고:
+        items = "".join(f"<li>{_escape(w)}</li>" for w in block.경고)
+        notes = f'<ul class="notes block">{items}</ul>'
+
     return (
-        f'<section class="card"><h2>3. {_escape(grain_label)} 추이</h2>'
-        f'<p class="sub">그래프: {_escape(plotted)} · 표에는 누적액과 직전 기간 대비 증감률까지</p>'
-        f"{legend}<div class=\"chart-scroll\">{chart}</div>"
-        f"{_render_table(table, with_total=False)}</section>"
+        f'<section class="card"><h2>{number}. {_escape(block.이름)}</h2>'
+        f"{subtitle}{chart_html}{body}{notes}</section>"
     )
 
 
-def _notes_section(result: AnalysisResult) -> str:
-    if not result.warnings:
+def _notes_section(report: Report) -> str:
+    if not report.warnings:
         return ""
-    items = "".join(f"<li>{_escape(w)}</li>" for w in result.warnings)
-    return (
-        '<section class="card"><h2>확인이 필요한 사항</h2>'
-        f'<ul class="notes">{items}</ul></section>'
+    items = "".join(f"<li>{_escape(w)}</li>" for w in report.warnings)
+    return f'<section class="card"><h2>확인이 필요한 사항</h2><ul class="notes">{items}</ul></section>'
+
+
+def render_report(report: Report, title: str = "") -> str:
+    """실행 결과를 자기완결형 HTML 문자열로 만든다."""
+    template = report.template
+    title = title or f"{template.이름} 보고서"
+    generated = report.generated_at.strftime("%Y-%m-%d %H:%M")
+    source = report.source or "(직접 입력)"
+
+    scope = f"{report.row_count:,}행"
+    if report.analyzed_count != report.row_count:
+        scope = f"{report.row_count:,}행 중 {report.analyzed_count:,}행 분석"
+
+    description = f"<br>{_escape(template.설명)}" if template.설명 else ""
+    blocks = "\n".join(
+        _render_block(block, number) for number, block in enumerate(report.blocks, start=1)
     )
-
-
-def render_report(result: AnalysisResult, title: str = "예산 분석 보고서") -> str:
-    """분석 결과를 자기완결형 HTML 문자열로 만든다."""
-    generated = result.generated_at.strftime("%Y-%m-%d %H:%M")
-    source = result.source or "(직접 입력)"
 
     return f"""<!DOCTYPE html>
 <html lang="ko">
@@ -421,19 +485,17 @@ def render_report(result: AnalysisResult, title: str = "예산 분석 보고서"
 <header class="doc">
   <h1>{_escape(title)}</h1>
   <div class="meta">
-    원본 <code>{_escape(source)}</code> · 시트 <code>{_escape(result.sheet)}</code>
-    · {result.row_count:,}행 · 생성 {generated}
-    <br>인식된 컬럼: {_escape(result.mapping.describe())}
+    원본 <code>{_escape(source)}</code> · 시트 <code>{_escape(report.sheet)}</code>
+    · {scope} · 생성 {generated}
+    <br>적용 양식: <code>{_escape(template.이름)}</code>{description}
   </div>
 </header>
-{_tiles(result)}
-{_breakdown_section(result)}
-{_execution_section(result)}
-{_trend_section(result)}
-{_notes_section(result)}
+{_tiles(report)}
+{blocks}
+{_notes_section(report)}
 <footer class="doc">
   이 파일은 외부 인터넷 연결 없이 열람·인쇄할 수 있습니다. ·
-  {_escape(_dt.datetime.now().year)} 예산 분석기
+  {_escape(report.generated_at.year)} 예산 분석기
 </footer>
 </div>
 </body>
@@ -441,7 +503,7 @@ def render_report(result: AnalysisResult, title: str = "예산 분석 보고서"
 """
 
 
-def write_report(path: str, result: AnalysisResult, title: str = "예산 분석 보고서") -> str:
+def write_report(path: str, report: Report, title: str = "") -> str:
     with open(path, "w", encoding="utf-8") as handle:
-        handle.write(render_report(result, title))
+        handle.write(render_report(report, title))
     return path

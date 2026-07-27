@@ -8,7 +8,7 @@ matplotlib 을 설치할 수 없는 환경이므로 SVG 를 직접 그린다. �
 from __future__ import annotations
 
 import math
-from typing import Sequence
+from typing import Callable, Sequence
 
 from .table import format_number, format_percent
 
@@ -200,22 +200,28 @@ def bar_chart(
     return "".join(parts)
 
 
+_STATUS_SYMBOL = {"over": "▲", "under": "▼", "normal": "●", "unknown": "◆"}
+
+
 def execution_chart(
     labels: Sequence[str],
     rates: Sequence[float | None],
     statuses: Sequence[str],
     width: float = 720,
+    status_class: Callable[[str], str] | None = None,
 ) -> str:
-    """집행률 막대. 상태색은 아이콘·문구와 함께만 쓴다(색 단독 판단 금지)."""
+    """비율 막대에 상태색을 입힌다. 상태 문구는 어떤 양식이냐에 따라 달라지므로
+    문구 -> 색 매핑은 호출한 쪽이 넘긴다. 색만으로 뜻을 전하지 않도록 기호와
+    문구를 항상 함께 그린다.
+    """
     labels = [str(label) for label in labels]
     if not labels:
-        return empty_chart("집행률을 계산할 항목이 없습니다.")
+        return empty_chart("표시할 항목이 없습니다.")
 
+    to_class = status_class or (lambda _status: "unknown")
     row_height = 30
     top, bottom = 10, 26
     font_size = 12.5
-    status_symbol = {"초과": "▲", "부진": "▼", "정상": "●", "예산없음(집행만)": "◆"}
-    status_class = {"초과": "over", "부진": "under", "정상": "normal"}
 
     label_width = min(max((_text_width(l, font_size) for l in labels), default=60) + 12, 200)
     label_width = max(label_width, 70)
@@ -249,8 +255,8 @@ def execution_chart(
         rate = rates[index] if index < len(rates) else None
         status = statuses[index] if index < len(statuses) else "-"
         y = top + index * row_height + (row_height - _BAR_THICKNESS) / 2
-        symbol = status_symbol.get(status, "·")
-        css = status_class.get(status, "unknown")
+        css = to_class(status)
+        symbol = _STATUS_SYMBOL.get(css, "·")
         rate_text = "-" if rate is None else format_percent(rate)
 
         parts.append(
