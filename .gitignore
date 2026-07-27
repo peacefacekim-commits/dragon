@@ -1,0 +1,8 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# 분석 산출물
+*_분석.html
+samples/예산_샘플.xlsx
