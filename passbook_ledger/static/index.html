@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>통장 스캔 → 결의서용 거래 내역 정리</title>
+<style>
+  :root { color-scheme: light; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Malgun Gothic", "Noto Sans KR", sans-serif;
+    margin: 0; padding: 24px; background: #f4f5f7; color: #1d2129;
+  }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  p.lead { color: #55606b; margin: 0 0 20px; font-size: 14px; line-height: 1.5; }
+  .panel {
+    background: #fff; border: 1px solid #dde1e6; border-radius: 8px;
+    padding: 16px; margin-bottom: 16px;
+  }
+  .row { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+  button {
+    background: #2563eb; color: #fff; border: none; border-radius: 6px;
+    padding: 8px 14px; font-size: 13px; cursor: pointer;
+  }
+  button.secondary { background: #eef1f4; color: #1d2129; }
+  button.danger { background: #fff; color: #d92d20; border: 1px solid #d92d20; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  input[type=file] { font-size: 13px; }
+  #status { font-size: 13px; color: #55606b; margin-top: 8px; white-space: pre-line; }
+  #thumbs { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  #thumbs img {
+    height: 90px; border: 1px solid #dde1e6; border-radius: 4px; cursor: zoom-in;
+  }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  th, td {
+    border: 1px solid #dde1e6; padding: 6px 8px; text-align: left;
+    min-width: 70px;
+  }
+  th { background: #f0f2f5; font-weight: 600; position: sticky; top: 0; }
+  td[contenteditable="true"]:focus { outline: 2px solid #2563eb; outline-offset: -2px; }
+  tr.needs-review td { background: #fff7e6; }
+  td.col-blank { background: #fafbfc; }
+  .badge { font-size: 11px; color: #b45309; }
+  .rowbtn { border: none; background: none; color: #d92d20; cursor: pointer; font-size: 13px; }
+  .table-wrap { overflow-x: auto; max-height: 60vh; overflow-y: auto; }
+  #lightbox {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,.8);
+    align-items: center; justify-content: center; z-index: 50; cursor: zoom-out;
+  }
+  #lightbox img { max-width: 95vw; max-height: 95vh; }
+  .hint { font-size: 12px; color: #8a94a1; margin-top: 6px; }
+</style>
+</head>
+<body>
+
+<h1>통장 스캔 → 결의서용 거래 내역 정리</h1>
+<p class="lead">
+  통장 거래내역을 스캔한 이미지를 올리면 거래일자·적요·금액·구분을 자동으로 읽어 표로 만듭니다.
+  자신 없게 인식된 칸은 값을 채우지 않고 <span class="badge">노란색</span>으로 표시하니,
+  스캔본과 대조해 직접 채워 넣으세요. 표 오른쪽의 납부자·관/항/목·비고 등은 통장에 없는
+  정보라 항상 빈 칸으로 시작합니다. 완성한 표는 복사하거나 CSV로 저장해 한글(HWP)의
+  편지 병합(메일 머지)에서 데이터 원본으로 쓰면 결의서 서식이 깨지지 않습니다.
+</p>
+
+<div class="panel">
+  <div class="row">
+    <input id="fileInput" type="file" accept="image/*" multiple>
+    <button id="recognizeBtn">인식하기</button>
+    <button id="addRowBtn" class="secondary">행 추가</button>
+    <button id="copyBtn" class="secondary">표 복사(클립보드)</button>
+    <button id="csvBtn" class="secondary">CSV로 저장</button>
+    <button id="clearBtn" class="danger">전체 지우기</button>
+  </div>
+  <div id="status"></div>
+  <div id="thumbs"></div>
+</div>
+
+<div class="panel">
+  <div class="table-wrap">
+    <table id="ledger">
+      <thead>
+        <tr>
+          <th>거래일자</th>
+          <th>적요</th>
+          <th>구분</th>
+          <th>금액</th>
+          <th>잔액</th>
+          <th>메모</th>
+          <th class="col-blank">납부자/수령인</th>
+          <th class="col-blank">관</th>
+          <th class="col-blank">항</th>
+          <th class="col-blank">목</th>
+          <th class="col-blank">비고</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+  <p class="hint">셀을 클릭하면 바로 고칠 수 있습니다. 노란 줄은 자동 인식이 확실치 않았던 행입니다.</p>
+</div>
+
+<div id="lightbox"><img id="lightboxImg"></div>
+
+<script>
+const DATA_COLS = ["거래일자", "적요", "구분", "금액", "잔액", "메모"];
+const BLANK_COLS = ["납부자수령인", "관", "항", "목", "비고"];
+const COL_COUNT = DATA_COLS.length + BLANK_COLS.length;
+
+const tbody = document.getElementById("tbody");
+const statusEl = document.getElementById("status");
+const thumbs = document.getElementById("thumbs");
+const lightbox = document.getElementById("lightbox");
+const lightboxImg = document.getElementById("lightboxImg");
+
+function addRow(row) {
+  row = row || {};
+  const tr = document.createElement("tr");
+  if (row["확인필요"]) tr.classList.add("needs-review");
+  const values = DATA_COLS.map(c => row[c] || "").concat(BLANK_COLS.map(() => ""));
+  values.forEach((v, i) => {
+    const td = document.createElement("td");
+    td.contentEditable = "true";
+    td.textContent = v;
+    if (i >= DATA_COLS.length) td.classList.add("col-blank");
+    tr.appendChild(td);
+  });
+  if (row["확인사유"]) tr.title = "확인 필요: " + row["확인사유"];
+  const delTd = document.createElement("td");
+  const delBtn = document.createElement("button");
+  delBtn.textContent = "삭제";
+  delBtn.className = "rowbtn";
+  delBtn.onclick = () => tr.remove();
+  delTd.appendChild(delBtn);
+  tr.appendChild(delTd);
+  tbody.appendChild(tr);
+}
+
+document.getElementById("addRowBtn").onclick = () => addRow();
+
+document.getElementById("clearBtn").onclick = () => {
+  if (confirm("표의 모든 행과 첨부 이미지를 지울까요?")) {
+    tbody.innerHTML = "";
+    thumbs.innerHTML = "";
+    statusEl.textContent = "";
+  }
+};
+
+function showThumb(file) {
+  const url = URL.createObjectURL(file);
+  const img = document.createElement("img");
+  img.src = url;
+  img.onclick = () => {
+    lightboxImg.src = url;
+    lightbox.style.display = "flex";
+  };
+  thumbs.appendChild(img);
+}
+lightbox.onclick = () => { lightbox.style.display = "none"; };
+
+document.getElementById("recognizeBtn").onclick = async () => {
+  const files = Array.from(document.getElementById("fileInput").files);
+  if (files.length === 0) {
+    statusEl.textContent = "먼저 통장 스캔 이미지를 선택하세요.";
+    return;
+  }
+  const btn = document.getElementById("recognizeBtn");
+  btn.disabled = true;
+  let ok = 0, fail = 0;
+  for (const file of files) {
+    showThumb(file);
+    statusEl.textContent = `인식 중... (${file.name})`;
+    try {
+      const formData = new FormData();
+      formData.append("image", file, file.name);
+      const res = await fetch("/api/ocr", { method: "POST", body: formData });
+      const data = await res.json();
+      if (!res.ok) {
+        fail++;
+        statusEl.textContent = `${file.name}: 인식 실패 - ${data.error || "알 수 없는 오류"}`;
+        continue;
+      }
+      (data.rows || []).forEach(addRow);
+      ok++;
+    } catch (err) {
+      fail++;
+      statusEl.textContent = `${file.name}: 서버와 통신 중 오류가 발생했습니다.`;
+    }
+  }
+  btn.disabled = false;
+  statusEl.textContent = `인식 완료: 이미지 ${ok}개 처리` + (fail ? `, 실패 ${fail}개 (표에서 직접 입력하세요)` : "");
+  document.getElementById("fileInput").value = "";
+};
+
+function tableRows() {
+  return Array.from(tbody.querySelectorAll("tr")).map(tr =>
+    Array.from(tr.querySelectorAll("td")).slice(0, COL_COUNT).map(td => td.textContent.trim())
+  );
+}
+
+const HEADERS = DATA_COLS.concat(["납부자/수령인", "관", "항", "목", "비고"]);
+
+document.getElementById("copyBtn").onclick = async () => {
+  const lines = [HEADERS.join("\t")].concat(tableRows().map(r => r.join("\t")));
+  await navigator.clipboard.writeText(lines.join("\n"));
+  statusEl.textContent = "표를 클립보드에 복사했습니다. 엑셀이나 한글 표에 그대로 붙여넣으세요.";
+};
+
+function csvEscape(v) {
+  if (/[",\n]/.test(v)) return '"' + v.replace(/"/g, '""') + '"';
+  return v;
+}
+
+document.getElementById("csvBtn").onclick = () => {
+  const lines = [HEADERS.map(csvEscape).join(",")]
+    .concat(tableRows().map(r => r.map(csvEscape).join(",")));
+  const blob = new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "통장정리.csv";
+  a.click();
+};
+
+// 빈 표로 시작하지 않도록 기본 행 몇 개를 미리 만들어 둔다.
+for (let i = 0; i < 3; i++) addRow();
+</script>
+</body>
+</html>
