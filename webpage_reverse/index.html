@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>웹페이지 코드로 보기</title>
+<title>붙여넣은 코드 정리하기</title>
 <style>
   :root { color-scheme: light dark; }
   body {
@@ -14,84 +14,86 @@
   @media (prefers-color-scheme: dark) {
     body { background: #1e1e1e; color: #e0e0e0; }
     .card { background: #2a2a2a !important; border-color: #3c3c3c !important; }
-    textarea, input[readonly] { background: #1e1e1e !important; color: #d4d4d4 !important; border-color: #444 !important; }
+    textarea { background: #1e1e1e !important; color: #d4d4d4 !important; border-color: #444 !important; }
   }
-  main { max-width: 720px; margin: 0 auto; }
+  main { max-width: 860px; margin: 0 auto; }
   h1 { font-size: 22px; margin-bottom: 4px; }
   .lead { color: #666; margin-top: 0; }
+  ol.steps { color: #666; font-size: 14px; padding-left: 20px; }
   .card {
     background: #fff; border: 1px solid #ddd; border-radius: 10px;
     padding: 20px 24px; margin: 20px 0;
   }
   .card h2 { font-size: 16px; margin-top: 0; }
-  .step { font-size: 13px; color: #888; text-transform: uppercase; letter-spacing: .05em; }
-  .bookmarklet-btn {
-    display: inline-block; padding: 10px 18px; margin: 12px 0;
-    background: #0e639c; color: #fff !important; text-decoration: none;
-    border-radius: 6px; font-weight: 600; cursor: grab;
-  }
-  .bookmarklet-btn:hover { background: #1177bb; }
-  .row { display: flex; gap: 8px; align-items: center; margin: 10px 0; }
-  input[readonly], textarea {
+  textarea {
     width: 100%; box-sizing: border-box; font-family: Consolas, "D2Coding", monospace;
     font-size: 12px; padding: 8px 10px; border: 1px solid #ccc; border-radius: 6px;
-    background: #fafafa; color: #333;
+    background: #fafafa; color: #333; resize: vertical; white-space: pre;
   }
-  textarea { height: 160px; resize: vertical; white-space: pre; }
-  button.copy {
-    flex-shrink: 0; padding: 8px 14px; border: none; border-radius: 6px;
-    background: #444; color: #fff; cursor: pointer; font-size: 13px;
+  #raw-input { height: 220px; }
+  #formatted-output { height: 320px; }
+  .actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  button {
+    padding: 9px 16px; border: none; border-radius: 6px; cursor: pointer;
+    font-size: 13px; font-weight: 600;
   }
-  button.copy:hover { background: #555; }
+  button.primary { background: #0e639c; color: #fff; }
+  button.primary:hover { background: #1177bb; }
+  button.secondary { background: #444; color: #fff; }
+  button.secondary:hover { background: #555; }
   .note { font-size: 13px; color: #777; }
   code { background: rgba(127,127,127,.15); padding: 1px 5px; border-radius: 4px; }
 </style>
 </head>
 <body>
 <main>
-  <h1>웹페이지 코드로 보기</h1>
+  <h1>붙여넣은 코드 정리하기</h1>
   <p class="lead">
-    지금 화면에 실제로 그려져 있는 페이지(자바스크립트로 나중에 추가된 내용까지 포함)를
-    사람이 읽기 좋은 HTML 코드로 정리해 새 탭에 보여줍니다. 외부 서버로 아무것도 보내지 않고
-    브라우저 안에서만 동작하므로, 인터넷이 없는 내부망(인트라넷) 페이지에서도 그대로 동작합니다.
+    개발자 도구에서 복사한 HTML 코드를 아래에 붙여넣으면 들여쓰기를 붙여
+    사람이 읽기 좋은 형태로 정리해 줍니다. 이 페이지 안에서만 동작하고
+    어디로도 전송되지 않으므로, 인터넷이 없는 내부망(인트라넷) PC에서도
+    파일을 그대로 열어 사용할 수 있습니다.
   </p>
 
   <div class="card">
-    <div class="step">방법 A · 즐겨찾기 한 번 클릭 (추천)</div>
-    <h2>아래 버튼을 즐겨찾기 표시줄로 드래그하세요</h2>
-    <a class="bookmarklet-btn" href="javascript:(function () { &quot;use strict&quot;; var VOID_TAGS = [ &quot;area&quot;, &quot;base&quot;, &quot;br&quot;, &quot;col&quot;, &quot;embed&quot;, &quot;hr&quot;, &quot;img&quot;, &quot;input&quot;, &quot;link&quot;, &quot;meta&quot;, &quot;param&quot;, &quot;source&quot;, &quot;track&quot;, &quot;wbr&quot;, ]; var RAW_TEXT_TAGS = [&quot;script&quot;, &quot;style&quot;]; function indent(n) { return &quot;  &quot;.repeat(n); } function escapeHtml(str) { return str .replace(/&amp;/g, &quot;&amp;amp;&quot;) .replace(/</g, &quot;&amp;lt;&quot;) .replace(/>/g, &quot;&amp;gt;&quot;); } function formatHtml(html) { var tokens = html.match(/<!--[\s\S]*?-->|<[^>]+>|[^<]+/g) || []; var out = []; var depth = 0; var rawTag = null; var rawBuffer = &quot;&quot;; tokens.forEach(function (token) { if (rawTag) { var closeRe = new RegExp(&quot;^</&quot; + rawTag + &quot;\\s*>$&quot;, &quot;i&quot;); if (closeRe.test(token.trim())) { if (rawBuffer.trim()) { out.push(indent(depth + 1) + rawBuffer.trim()); } out.push(indent(depth) + token.trim()); rawTag = null; rawBuffer = &quot;&quot;; } else { rawBuffer += token; } return; } if (/^<!--/.test(token)) { out.push(indent(depth) + token.trim()); return; } if (/^<[^>]+>$/.test(token)) { var isClosing = /^<\//.test(token); var isSelfClosing = /\/>$/.test(token); var tagName = (token.match(/^<\/?([a-zA-Z0-9-]+)/) || [])[1]; var isVoid = tagName &amp;&amp; VOID_TAGS.indexOf(tagName.toLowerCase()) !== -1; if (isClosing) { depth = Math.max(0, depth - 1); out.push(indent(depth) + token.trim()); } else { out.push(indent(depth) + token.trim()); if ( tagName &amp;&amp; RAW_TEXT_TAGS.indexOf(tagName.toLowerCase()) !== -1 &amp;&amp; !isSelfClosing ) { rawTag = tagName.toLowerCase(); } else if (!isSelfClosing &amp;&amp; !isVoid) { depth++; } } } else { var text = token.trim(); if (text) out.push(indent(depth) + text); } }); return out.join(&quot;\n&quot;); } var sourceHtml = document.documentElement.outerHTML; var formatted = formatHtml(sourceHtml); var escaped = escapeHtml(formatted); var pageTitle = document.title || &quot;제목 없음&quot;; var pageUrl = location.href; var capturedAt = new Date().toLocaleString(); var viewerHtml = &quot;<!DOCTYPE html><html><head><meta charset=\&quot;utf-8\&quot;>&quot; + &quot;<title>코드로 보기 - &quot; + escapeHtml(pageTitle) + &quot;</title>&quot; + &quot;<style>&quot; + &quot;body{margin:0;background:#1e1e1e;color:#d4d4d4;font-family:Consolas,'D2Coding',monospace;}&quot; + &quot;header{position:sticky;top:0;background:#252526;border-bottom:1px solid #3c3c3c;padding:10px 16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;}&quot; + &quot;header .info{flex:1;min-width:200px;font-size:12px;color:#9d9d9d;overflow-wrap:anywhere;}&quot; + &quot;header .info b{color:#d4d4d4;}&quot; + &quot;button{background:#0e639c;color:#fff;border:none;padding:6px 12px;border-radius:4px;cursor:pointer;font-size:12px;}&quot; + &quot;button:hover{background:#1177bb;}&quot; + &quot;pre{margin:0;padding:16px;white-space:pre-wrap;word-break:break-all;font-size:13px;line-height:1.5;}&quot; + &quot;</style></head><body>&quot; + &quot;<header>&quot; + &quot;<div class=\&quot;info\&quot;><b>&quot; + escapeHtml(pageTitle) + &quot;</b><br>&quot; + escapeHtml(pageUrl) + &quot; · &quot; + escapeHtml(capturedAt) + &quot; 캡처</div>&quot; + &quot;<button id=\&quot;__copy_btn\&quot;>코드 복사</button>&quot; + &quot;<button id=\&quot;__download_btn\&quot;>.html로 다운로드</button>&quot; + &quot;</header>&quot; + &quot;<pre id=\&quot;__source_code\&quot;>&quot; + escaped + &quot;</pre>&quot; + &quot;<script>&quot; + &quot;document.getElementById('__copy_btn').addEventListener('click', function () {&quot; + &quot;  var text = document.getElementById('__source_code').textContent;&quot; + &quot;  function fallback() {&quot; + &quot;    var ta = document.createElement('textarea');&quot; + &quot;    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';&quot; + &quot;    document.body.appendChild(ta); ta.select();&quot; + &quot;    try { document.execCommand('copy'); } catch (e) {}&quot; + &quot;    document.body.removeChild(ta);&quot; + &quot;  }&quot; + &quot;  if (navigator.clipboard &amp;&amp; navigator.clipboard.writeText) {&quot; + &quot;    navigator.clipboard.writeText(text).catch(fallback);&quot; + &quot;  } else { fallback(); }&quot; + &quot;  var btn = document.getElementById('__copy_btn');&quot; + &quot;  var original = btn.textContent; btn.textContent = '복사됨!';&quot; + &quot;  setTimeout(function () { btn.textContent = original; }, 1200);&quot; + &quot;});&quot; + &quot;document.getElementById('__download_btn').addEventListener('click', function () {&quot; + &quot;  var text = document.getElementById('__source_code').textContent;&quot; + &quot;  var blob = new Blob([text], { type: 'text/html' });&quot; + &quot;  var a = document.createElement('a');&quot; + &quot;  a.href = URL.createObjectURL(blob);&quot; + &quot;  a.download = 'page-source.html';&quot; + &quot;  document.body.appendChild(a); a.click(); document.body.removeChild(a);&quot; + &quot;});&quot; + &quot;<&quot; + &quot;/script>&quot; + &quot;</body></html>&quot;; var blob = new Blob([viewerHtml], { type: &quot;text/html&quot; }); var url = URL.createObjectURL(blob); window.open(url, &quot;_blank&quot;); })();" onclick="return false;">📄 코드로 보기</a>
-    <p class="note">
-      즐겨찾기 표시줄이 안 보이면 <code>Ctrl+Shift+B</code>(Mac은 <code>Cmd+Shift+B</code>)로 켤 수 있습니다.
-      드래그가 안 되는 환경이라면 아래 링크를 복사해 새 즐겨찾기의 주소(URL) 칸에 직접 붙여넣으세요.
-    </p>
-    <div class="row">
-      <input id="bookmarklet-url" type="text" readonly value="javascript:(function () { &quot;use strict&quot;; var VOID_TAGS = [ &quot;area&quot;, &quot;base&quot;, &quot;br&quot;, &quot;col&quot;, &quot;embed&quot;, &quot;hr&quot;, &quot;img&quot;, &quot;input&quot;, &quot;link&quot;, &quot;meta&quot;, &quot;param&quot;, &quot;source&quot;, &quot;track&quot;, &quot;wbr&quot;, ]; var RAW_TEXT_TAGS = [&quot;script&quot;, &quot;style&quot;]; function indent(n) { return &quot;  &quot;.repeat(n); } function escapeHtml(str) { return str .replace(/&amp;/g, &quot;&amp;amp;&quot;) .replace(/</g, &quot;&amp;lt;&quot;) .replace(/>/g, &quot;&amp;gt;&quot;); } function formatHtml(html) { var tokens = html.match(/<!--[\s\S]*?-->|<[^>]+>|[^<]+/g) || []; var out = []; var depth = 0; var rawTag = null; var rawBuffer = &quot;&quot;; tokens.forEach(function (token) { if (rawTag) { var closeRe = new RegExp(&quot;^</&quot; + rawTag + &quot;\\s*>$&quot;, &quot;i&quot;); if (closeRe.test(token.trim())) { if (rawBuffer.trim()) { out.push(indent(depth + 1) + rawBuffer.trim()); } out.push(indent(depth) + token.trim()); rawTag = null; rawBuffer = &quot;&quot;; } else { rawBuffer += token; } return; } if (/^<!--/.test(token)) { out.push(indent(depth) + token.trim()); return; } if (/^<[^>]+>$/.test(token)) { var isClosing = /^<\//.test(token); var isSelfClosing = /\/>$/.test(token); var tagName = (token.match(/^<\/?([a-zA-Z0-9-]+)/) || [])[1]; var isVoid = tagName &amp;&amp; VOID_TAGS.indexOf(tagName.toLowerCase()) !== -1; if (isClosing) { depth = Math.max(0, depth - 1); out.push(indent(depth) + token.trim()); } else { out.push(indent(depth) + token.trim()); if ( tagName &amp;&amp; RAW_TEXT_TAGS.indexOf(tagName.toLowerCase()) !== -1 &amp;&amp; !isSelfClosing ) { rawTag = tagName.toLowerCase(); } else if (!isSelfClosing &amp;&amp; !isVoid) { depth++; } } } else { var text = token.trim(); if (text) out.push(indent(depth) + text); } }); return out.join(&quot;\n&quot;); } var sourceHtml = document.documentElement.outerHTML; var formatted = formatHtml(sourceHtml); var escaped = escapeHtml(formatted); var pageTitle = document.title || &quot;제목 없음&quot;; var pageUrl = location.href; var capturedAt = new Date().toLocaleString(); var viewerHtml = &quot;<!DOCTYPE html><html><head><meta charset=\&quot;utf-8\&quot;>&quot; + &quot;<title>코드로 보기 - &quot; + escapeHtml(pageTitle) + &quot;</title>&quot; + &quot;<style>&quot; + &quot;body{margin:0;background:#1e1e1e;color:#d4d4d4;font-family:Consolas,'D2Coding',monospace;}&quot; + &quot;header{position:sticky;top:0;background:#252526;border-bottom:1px solid #3c3c3c;padding:10px 16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;}&quot; + &quot;header .info{flex:1;min-width:200px;font-size:12px;color:#9d9d9d;overflow-wrap:anywhere;}&quot; + &quot;header .info b{color:#d4d4d4;}&quot; + &quot;button{background:#0e639c;color:#fff;border:none;padding:6px 12px;border-radius:4px;cursor:pointer;font-size:12px;}&quot; + &quot;button:hover{background:#1177bb;}&quot; + &quot;pre{margin:0;padding:16px;white-space:pre-wrap;word-break:break-all;font-size:13px;line-height:1.5;}&quot; + &quot;</style></head><body>&quot; + &quot;<header>&quot; + &quot;<div class=\&quot;info\&quot;><b>&quot; + escapeHtml(pageTitle) + &quot;</b><br>&quot; + escapeHtml(pageUrl) + &quot; · &quot; + escapeHtml(capturedAt) + &quot; 캡처</div>&quot; + &quot;<button id=\&quot;__copy_btn\&quot;>코드 복사</button>&quot; + &quot;<button id=\&quot;__download_btn\&quot;>.html로 다운로드</button>&quot; + &quot;</header>&quot; + &quot;<pre id=\&quot;__source_code\&quot;>&quot; + escaped + &quot;</pre>&quot; + &quot;<script>&quot; + &quot;document.getElementById('__copy_btn').addEventListener('click', function () {&quot; + &quot;  var text = document.getElementById('__source_code').textContent;&quot; + &quot;  function fallback() {&quot; + &quot;    var ta = document.createElement('textarea');&quot; + &quot;    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';&quot; + &quot;    document.body.appendChild(ta); ta.select();&quot; + &quot;    try { document.execCommand('copy'); } catch (e) {}&quot; + &quot;    document.body.removeChild(ta);&quot; + &quot;  }&quot; + &quot;  if (navigator.clipboard &amp;&amp; navigator.clipboard.writeText) {&quot; + &quot;    navigator.clipboard.writeText(text).catch(fallback);&quot; + &quot;  } else { fallback(); }&quot; + &quot;  var btn = document.getElementById('__copy_btn');&quot; + &quot;  var original = btn.textContent; btn.textContent = '복사됨!';&quot; + &quot;  setTimeout(function () { btn.textContent = original; }, 1200);&quot; + &quot;});&quot; + &quot;document.getElementById('__download_btn').addEventListener('click', function () {&quot; + &quot;  var text = document.getElementById('__source_code').textContent;&quot; + &quot;  var blob = new Blob([text], { type: 'text/html' });&quot; + &quot;  var a = document.createElement('a');&quot; + &quot;  a.href = URL.createObjectURL(blob);&quot; + &quot;  a.download = 'page-source.html';&quot; + &quot;  document.body.appendChild(a); a.click(); document.body.removeChild(a);&quot; + &quot;});&quot; + &quot;<&quot; + &quot;/script>&quot; + &quot;</body></html>&quot;; var blob = new Blob([viewerHtml], { type: &quot;text/html&quot; }); var url = URL.createObjectURL(blob); window.open(url, &quot;_blank&quot;); })();">
-      <button class="copy" data-copy-target="bookmarklet-url">복사</button>
-    </div>
-    <p class="note">등록해 두면, 코드로 보고 싶은 아무 페이지에서나 클릭 한 번으로 실행됩니다.</p>
+    <h2>1. 개발자 도구에서 코드 복사하기</h2>
+    <ol class="steps">
+      <li>정리하고 싶은 페이지에서 개발자 도구(<code>F12</code>)를 열고 <b>Elements</b>
+        (요소) 탭으로 이동합니다.</li>
+      <li>원하는 요소를 우클릭 → <b>Copy → Copy outerHTML</b>을 선택합니다.
+        (페이지 전체를 복사하려면 트리 맨 위의 <code>&lt;html&gt;</code> 요소에서
+        우클릭하세요.)</li>
+      <li>또는 <b>Console</b> 탭에 <code>document.documentElement.outerHTML</code>
+        을 입력해 나온 결과 문자열을 복사해도 됩니다.</li>
+    </ol>
   </div>
 
   <div class="card">
-    <div class="step">방법 B · 개발자 도구 콘솔에 붙여넣기</div>
-    <h2>아래 코드를 복사해 콘솔(F12 → Console)에 붙여넣고 Enter</h2>
-    <div class="row">
-      <textarea id="console-script" readonly>/*
- * 웹페이지 코드로 보기 (개발자 도구용)
- *
- * 지금 브라우저에 "실제로 그려져 있는" DOM(자바스크립트로 나중에 추가/변경된
- * 내용까지 전부 포함)을 사람이 읽기 좋은 HTML 코드로 정리해서 새 탭에 보여줍니다.
- * 브라우저 기본 기능인 "페이지 소스 보기(Ctrl+U)"는 서버가 처음 내려준 원본
- * HTML만 보여주지만, 이 도구는 지금 화면에 보이는 그대로의 코드를 보여줍니다.
- *
- * 사용법
- *   1) 코드로 보고 싶은 페이지에서 개발자 도구(F12 / Ctrl+Shift+I)를 엽니다.
- *   2) Console 탭에 이 파일 내용 전체를 붙여넣고 Enter.
- *   3) 정리된 HTML 코드가 담긴 새 탭이 열립니다. 복사/다운로드 버튼도 함께 나옵니다.
- *
- * 외부 서버로 아무것도 전송하지 않고, CDN 등 외부 리소스도 전혀 불러오지 않는
- * 순수 자바스크립트입니다. 브라우저 안에서만 동작하므로 인터넷이 없는
- * 내부망(인트라넷) 페이지에서도 동일하게 동작합니다.
- */
+    <h2>2. 아래에 붙여넣고 정리하기</h2>
+    <textarea id="raw-input" placeholder="여기에 복사한 코드를 붙여넣으세요 (Ctrl+V)"></textarea>
+    <div class="actions">
+      <button class="primary" id="format-btn">코드 정리하기</button>
+      <button class="secondary" id="clear-btn">지우기</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>3. 정리된 결과</h2>
+    <textarea id="formatted-output" readonly placeholder="정리 버튼을 누르면 여기에 결과가 나타납니다"></textarea>
+    <div class="actions">
+      <button class="secondary" id="copy-btn">결과 복사</button>
+      <button class="secondary" id="download-btn">.html로 다운로드</button>
+    </div>
+  </div>
+
+  <p class="note">
+    HTML 태그 구조를 기준으로 줄바꿈·들여쓰기만 다시 정리합니다.
+    <code>&lt;script&gt;</code>/<code>&lt;style&gt;</code> 안쪽 내용은 태그로
+    잘못 잘리지 않도록 통째로 다룹니다. 입력 내용은 어디로도 전송되지 않고
+    이 브라우저 탭 안에서만 처리됩니다.
+  </p>
+</main>
+<script>
 (function () {
   "use strict";
 
@@ -105,17 +107,10 @@
     return "  ".repeat(n);
   }
 
-  function escapeHtml(str) {
-    return str
-      .replace(/&amp;/g, "&amp;amp;")
-      .replace(/&lt;/g, "&amp;lt;")
-      .replace(/&gt;/g, "&amp;gt;");
-  }
-
   // 태그 단위로 잘라 들여쓰기를 붙여 사람이 읽기 좋은 형태로 재구성한다.
-  // &lt;script&gt;/&lt;style&gt; 안쪽 내용은 태그로 착각해 잘못 잘리지 않도록 통째로 다룬다.
+  // <script>/<style> 안쪽 내용은 태그로 착각해 잘못 잘리지 않도록 통째로 다룬다.
   function formatHtml(html) {
-    var tokens = html.match(/&lt;!--[\s\S]*?--&gt;|&lt;[^&gt;]+&gt;|[^&lt;]+/g) || [];
+    var tokens = html.match(/<!--[\s\S]*?-->|<[^>]+>|[^<]+/g) || [];
     var out = [];
     var depth = 0;
     var rawTag = null;
@@ -123,7 +118,7 @@
 
     tokens.forEach(function (token) {
       if (rawTag) {
-        var closeRe = new RegExp("^&lt;/" + rawTag + "\\s*&gt;$", "i");
+        var closeRe = new RegExp("^</" + rawTag + "\\s*>$", "i");
         if (closeRe.test(token.trim())) {
           if (rawBuffer.trim()) {
             out.push(indent(depth + 1) + rawBuffer.trim());
@@ -137,16 +132,16 @@
         return;
       }
 
-      if (/^&lt;!--/.test(token)) {
+      if (/^<!--/.test(token)) {
         out.push(indent(depth) + token.trim());
         return;
       }
 
-      if (/^&lt;[^&gt;]+&gt;$/.test(token)) {
-        var isClosing = /^&lt;\//.test(token);
-        var isSelfClosing = /\/&gt;$/.test(token);
-        var tagName = (token.match(/^&lt;\/?([a-zA-Z0-9-]+)/) || [])[1];
-        var isVoid = tagName &amp;&amp; VOID_TAGS.indexOf(tagName.toLowerCase()) !== -1;
+      if (/^<[^>]+>$/.test(token)) {
+        var isClosing = /^<\//.test(token);
+        var isSelfClosing = /\/>$/.test(token);
+        var tagName = (token.match(/^<\/?([a-zA-Z0-9-]+)/) || [])[1];
+        var isVoid = tagName && VOID_TAGS.indexOf(tagName.toLowerCase()) !== -1;
 
         if (isClosing) {
           depth = Math.max(0, depth - 1);
@@ -154,12 +149,12 @@
         } else {
           out.push(indent(depth) + token.trim());
           if (
-            tagName &amp;&amp;
-            RAW_TEXT_TAGS.indexOf(tagName.toLowerCase()) !== -1 &amp;&amp;
+            tagName &&
+            RAW_TEXT_TAGS.indexOf(tagName.toLowerCase()) !== -1 &&
             !isSelfClosing
           ) {
             rawTag = tagName.toLowerCase();
-          } else if (!isSelfClosing &amp;&amp; !isVoid) {
+          } else if (!isSelfClosing && !isVoid) {
             depth++;
           }
         }
@@ -172,100 +167,49 @@
     return out.join("\n");
   }
 
-  var sourceHtml = document.documentElement.outerHTML;
-  var formatted = formatHtml(sourceHtml);
-  var escaped = escapeHtml(formatted);
-  var pageTitle = document.title || "제목 없음";
-  var pageUrl = location.href;
-  var capturedAt = new Date().toLocaleString();
+  var input = document.getElementById("raw-input");
+  var output = document.getElementById("formatted-output");
 
-  var viewerHtml =
-    "&lt;!DOCTYPE html&gt;&lt;html&gt;&lt;head&gt;&lt;meta charset=\"utf-8\"&gt;" +
-    "&lt;title&gt;코드로 보기 - " + escapeHtml(pageTitle) + "&lt;/title&gt;" +
-    "&lt;style&gt;" +
-    "body{margin:0;background:#1e1e1e;color:#d4d4d4;font-family:Consolas,'D2Coding',monospace;}" +
-    "header{position:sticky;top:0;background:#252526;border-bottom:1px solid #3c3c3c;padding:10px 16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;}" +
-    "header .info{flex:1;min-width:200px;font-size:12px;color:#9d9d9d;overflow-wrap:anywhere;}" +
-    "header .info b{color:#d4d4d4;}" +
-    "button{background:#0e639c;color:#fff;border:none;padding:6px 12px;border-radius:4px;cursor:pointer;font-size:12px;}" +
-    "button:hover{background:#1177bb;}" +
-    "pre{margin:0;padding:16px;white-space:pre-wrap;word-break:break-all;font-size:13px;line-height:1.5;}" +
-    "&lt;/style&gt;&lt;/head&gt;&lt;body&gt;" +
-    "&lt;header&gt;" +
-    "&lt;div class=\"info\"&gt;&lt;b&gt;" + escapeHtml(pageTitle) + "&lt;/b&gt;&lt;br&gt;" +
-    escapeHtml(pageUrl) + " · " + escapeHtml(capturedAt) + " 캡처&lt;/div&gt;" +
-    "&lt;button id=\"__copy_btn\"&gt;코드 복사&lt;/button&gt;" +
-    "&lt;button id=\"__download_btn\"&gt;.html로 다운로드&lt;/button&gt;" +
-    "&lt;/header&gt;" +
-    "&lt;pre id=\"__source_code\"&gt;" + escaped + "&lt;/pre&gt;" +
-    "&lt;script&gt;" +
-    "document.getElementById('__copy_btn').addEventListener('click', function () {" +
-    "  var text = document.getElementById('__source_code').textContent;" +
-    "  function fallback() {" +
-    "    var ta = document.createElement('textarea');" +
-    "    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';" +
-    "    document.body.appendChild(ta); ta.select();" +
-    "    try { document.execCommand('copy'); } catch (e) {}" +
-    "    document.body.removeChild(ta);" +
-    "  }" +
-    "  if (navigator.clipboard &amp;&amp; navigator.clipboard.writeText) {" +
-    "    navigator.clipboard.writeText(text).catch(fallback);" +
-    "  } else { fallback(); }" +
-    "  var btn = document.getElementById('__copy_btn');" +
-    "  var original = btn.textContent; btn.textContent = '복사됨!';" +
-    "  setTimeout(function () { btn.textContent = original; }, 1200);" +
-    "});" +
-    "document.getElementById('__download_btn').addEventListener('click', function () {" +
-    "  var text = document.getElementById('__source_code').textContent;" +
-    "  var blob = new Blob([text], { type: 'text/html' });" +
-    "  var a = document.createElement('a');" +
-    "  a.href = URL.createObjectURL(blob);" +
-    "  a.download = 'page-source.html';" +
-    "  document.body.appendChild(a); a.click(); document.body.removeChild(a);" +
-    "});" +
-    "&lt;" + "/script&gt;" +
-    "&lt;/body&gt;&lt;/html&gt;";
-
-  var blob = new Blob([viewerHtml], { type: "text/html" });
-  var url = URL.createObjectURL(blob);
-  window.open(url, "_blank");
-})();
-</textarea>
-    </div>
-    <button class="copy" data-copy-target="console-script">코드 복사</button>
-    <p class="note">
-      콘솔에 처음 붙여넣으면 브라우저가 "코드를 붙여넣으면 안 됩니다" 같은 경고를 보여줄 수 있습니다.
-      직접 입력한 것이 맞다면 안내대로 <code>allow pasting</code> 등을 입력해 진행하면 됩니다.
-    </p>
-  </div>
-
-  <p class="note">
-    실행하면 정리된 HTML 코드가 담긴 새 탭이 열립니다(팝업 차단 알림이 뜨면 허용해 주세요).
-    그 탭에서 코드를 다시 복사하거나 <code>.html</code> 파일로 내려받을 수 있습니다.
-  </p>
-</main>
-<script>
-  document.querySelectorAll("button.copy").forEach(function (btn) {
-    btn.addEventListener("click", function () {
-      var target = document.getElementById(btn.getAttribute("data-copy-target"));
-      var text = target.value;
-      function fallback() {
-        target.removeAttribute("readonly");
-        target.focus();
-        target.select();
-        try { document.execCommand("copy"); } catch (e) {}
-        target.setAttribute("readonly", "readonly");
-      }
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(text).catch(fallback);
-      } else {
-        fallback();
-      }
-      var original = btn.textContent;
-      btn.textContent = "복사됨!";
-      setTimeout(function () { btn.textContent = original; }, 1200);
-    });
+  document.getElementById("format-btn").addEventListener("click", function () {
+    output.value = formatHtml(input.value);
   });
+
+  document.getElementById("clear-btn").addEventListener("click", function () {
+    input.value = "";
+    output.value = "";
+    input.focus();
+  });
+
+  document.getElementById("copy-btn").addEventListener("click", function (e) {
+    var text = output.value;
+    function fallback() {
+      output.removeAttribute("readonly");
+      output.focus();
+      output.select();
+      try { document.execCommand("copy"); } catch (err) {}
+      output.setAttribute("readonly", "readonly");
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).catch(fallback);
+    } else {
+      fallback();
+    }
+    var btn = e.currentTarget;
+    var original = btn.textContent;
+    btn.textContent = "복사됨!";
+    setTimeout(function () { btn.textContent = original; }, 1200);
+  });
+
+  document.getElementById("download-btn").addEventListener("click", function () {
+    var blob = new Blob([output.value], { type: "text/html" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "formatted-page.html";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  });
+})();
 </script>
 </body>
 </html>
