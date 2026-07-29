@@ -57,14 +57,27 @@
 
   <div class="card">
     <h2>1. 개발자 도구에서 코드 복사하기</h2>
+    <p class="note" style="margin-top:0;">
+      사이트마다 내용이 담기는 위치가 다릅니다. 아래 <b>A</b> 방법으로 잘 안 되면
+      <b>B</b> 방법을 시도해 보세요.
+    </p>
+    <p><b>A. 화면에 보이는 요소에서 바로 복사 (일반적인 게시판)</b></p>
     <ol class="steps">
-      <li>정리하고 싶은 페이지에서 개발자 도구(<code>F12</code>)를 열고 <b>Elements</b>
-        (요소) 탭으로 이동합니다.</li>
-      <li>원하는 요소를 우클릭 → <b>Copy → Copy outerHTML</b>을 선택합니다.
-        (페이지 전체를 복사하려면 트리 맨 위의 <code>&lt;html&gt;</code> 요소에서
-        우클릭하세요.)</li>
-      <li>또는 <b>Console</b> 탭에 <code>document.documentElement.outerHTML</code>
-        을 입력해 나온 결과 문자열을 복사해도 됩니다.</li>
+      <li>개발자 도구(<code>F12</code>)를 열고 <b>Elements</b>(요소) 탭으로 이동합니다.</li>
+      <li>왼쪽 위 <b>요소 선택 도구</b>(화살표 아이콘, <code>Ctrl+Shift+C</code>)를 누른 뒤
+        화면에서 보고 싶은 글 제목·본문을 직접 클릭하면, Elements 탭이 그 부분의
+        HTML로 자동으로 이동합니다.</li>
+      <li>그 태그(또는 본문 전체를 감싸는 상위 요소)를 우클릭 →
+        <b>Copy → Copy outerHTML</b>.</li>
+    </ol>
+    <p><b>B. Network 탭에서 API 응답(JSON)으로 복사 (클릭해야 내용이 뜨는 게시판)</b></p>
+    <ol class="steps">
+      <li>개발자 도구의 <b>Network</b> 탭을 열고 <b>Fetch/XHR</b> 필터를 켠 상태로 둡니다.</li>
+      <li>목록에서 보고 싶은 질문을 클릭합니다. 그 순간 목록 맨 아래에
+        새 요청이 하나 추가됩니다 — 그게 상세 내용을 가져오는 요청입니다.</li>
+      <li>그 요청을 클릭 → <b>Response</b> 탭에서 제목·본문 글자가 보이는지 확인합니다.
+        (여러 개 떴다면 응답 안에 그 글의 실제 문장이 들어있는 걸 찾으면 됩니다.)</li>
+      <li>Response 내용 안에서 우클릭 → <b>Copy → Copy response</b> (또는 전체 선택 후 복사).</li>
     </ol>
   </div>
 
@@ -82,12 +95,13 @@
     <textarea id="formatted-output" readonly placeholder="정리 버튼을 누르면 여기에 결과가 나타납니다"></textarea>
     <div class="actions">
       <button class="secondary" id="copy-btn">결과 복사</button>
-      <button class="secondary" id="download-btn">.html로 다운로드</button>
+      <button class="secondary" id="download-btn">파일로 다운로드</button>
     </div>
   </div>
 
   <p class="note">
-    HTML 태그 구조를 기준으로 줄바꿈·들여쓰기만 다시 정리합니다.
+    붙여넣은 내용이 <code>{ }</code>/<code>[ ]</code> 로 시작하는 JSON이면 자동으로
+    JSON으로, 아니면 HTML 태그 구조로 인식해 줄바꿈·들여쓰기를 정리합니다.
     <code>&lt;script&gt;</code>/<code>&lt;style&gt;</code> 안쪽 내용은 태그로
     잘못 잘리지 않도록 통째로 다룹니다. 입력 내용은 어디로도 전송되지 않고
     이 브라우저 탭 안에서만 처리됩니다.
@@ -167,11 +181,27 @@
     return out.join("\n");
   }
 
+  // 붙여넣은 내용이 JSON이면 JSON.stringify로, 아니면 HTML 포매터로 정리한다.
+  function formatInput(text) {
+    var trimmed = text.trim();
+    if (/^[{[]/.test(trimmed)) {
+      try {
+        return { type: "json", text: JSON.stringify(JSON.parse(trimmed), null, 2) };
+      } catch (e) {
+        // JSON 파싱에 실패하면 HTML/일반 텍스트로 취급한다.
+      }
+    }
+    return { type: "html", text: formatHtml(text) };
+  }
+
   var input = document.getElementById("raw-input");
   var output = document.getElementById("formatted-output");
+  var outputType = "html";
 
   document.getElementById("format-btn").addEventListener("click", function () {
-    output.value = formatHtml(input.value);
+    var result = formatInput(input.value);
+    output.value = result.text;
+    outputType = result.type;
   });
 
   document.getElementById("clear-btn").addEventListener("click", function () {
@@ -201,10 +231,11 @@
   });
 
   document.getElementById("download-btn").addEventListener("click", function () {
-    var blob = new Blob([output.value], { type: "text/html" });
+    var isJson = outputType === "json";
+    var blob = new Blob([output.value], { type: isJson ? "application/json" : "text/html" });
     var a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = "formatted-page.html";
+    a.download = isJson ? "formatted-data.json" : "formatted-page.html";
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
