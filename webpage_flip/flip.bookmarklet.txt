@@ -1,0 +1,1 @@
+javascript:(function(){var i="__webpage_flip_180__";var e=document.getElementById(i);if(e){e.remove();return;}var s=document.createElement("style");s.id=i;s.textContent="html{transform:rotate(180deg) !important;transform-origin:50% 50% !important;}";(document.head||document.documentElement).appendChild(s);})();
