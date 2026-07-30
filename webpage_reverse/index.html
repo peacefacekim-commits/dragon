@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>붙여넣은 코드 정리하기</title>
+<title>Q&A 취합 정리 도구</title>
 <style>
   :root { color-scheme: light dark; }
   body {
@@ -14,7 +14,9 @@
   @media (prefers-color-scheme: dark) {
     body { background: #1e1e1e; color: #e0e0e0; }
     .card { background: #2a2a2a !important; border-color: #3c3c3c !important; }
-    textarea { background: #1e1e1e !important; color: #d4d4d4 !important; border-color: #444 !important; }
+    textarea, input[type="text"] { background: #1e1e1e !important; color: #d4d4d4 !important; border-color: #444 !important; }
+    .entry { background: #232323 !important; border-color: #3c3c3c !important; }
+    .entry summary { color: #e0e0e0 !important; }
   }
   main { max-width: 860px; margin: 0 auto; }
   h1 { font-size: 22px; margin-bottom: 4px; }
@@ -25,14 +27,16 @@
     padding: 20px 24px; margin: 20px 0;
   }
   .card h2 { font-size: 16px; margin-top: 0; }
-  textarea {
+  textarea, input[type="text"] {
     width: 100%; box-sizing: border-box; font-family: Consolas, "D2Coding", monospace;
     font-size: 12px; padding: 8px 10px; border: 1px solid #ccc; border-radius: 6px;
-    background: #fafafa; color: #333; resize: vertical; white-space: pre;
+    background: #fafafa; color: #333;
   }
-  #raw-input { height: 220px; }
-  #formatted-output { height: 320px; }
-  .actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  textarea { resize: vertical; white-space: pre; }
+  input[type="text"] { font-family: inherit; font-size: 13px; margin-bottom: 8px; }
+  #raw-input { height: 180px; }
+  #combined-output { height: 260px; }
+  .actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; align-items: center; }
   button {
     padding: 9px 16px; border: none; border-radius: 6px; cursor: pointer;
     font-size: 13px; font-weight: 600;
@@ -41,18 +45,44 @@
   button.primary:hover { background: #1177bb; }
   button.secondary { background: #444; color: #fff; }
   button.secondary:hover { background: #555; }
+  button.danger { background: #a33; color: #fff; }
+  button.danger:hover { background: #c33; }
   .note { font-size: 13px; color: #777; }
   code { background: rgba(127,127,127,.15); padding: 1px 5px; border-radius: 4px; }
+  .count { font-size: 13px; color: #888; margin-left: auto; }
+  #entry-list { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  .entry {
+    border: 1px solid #e0e0e0; border-radius: 8px; background: #fafafa;
+  }
+  .entry summary {
+    cursor: pointer; padding: 10px 14px; font-size: 13px; font-weight: 600;
+    display: flex; align-items: center; gap: 8px; list-style: none;
+  }
+  .entry summary::-webkit-details-marker { display: none; }
+  .entry summary .badge {
+    font-size: 11px; font-weight: 400; color: #888; background: rgba(127,127,127,.15);
+    padding: 1px 6px; border-radius: 4px;
+  }
+  .entry summary .remove-entry {
+    margin-left: auto; background: none; border: none; color: #a33; font-size: 12px;
+    font-weight: 600; cursor: pointer; padding: 2px 6px;
+  }
+  .entry pre {
+    margin: 0; padding: 12px 14px; border-top: 1px solid #e0e0e0;
+    font-family: Consolas, "D2Coding", monospace; font-size: 12px; white-space: pre-wrap;
+    word-break: break-all; max-height: 320px; overflow: auto;
+  }
+  .empty-hint { color: #999; font-size: 13px; padding: 8px 0; }
 </style>
 </head>
 <body>
 <main>
-  <h1>붙여넣은 코드 정리하기</h1>
+  <h1>Q&amp;A 취합 정리 도구</h1>
   <p class="lead">
-    개발자 도구에서 복사한 HTML 코드를 아래에 붙여넣으면 들여쓰기를 붙여
-    사람이 읽기 좋은 형태로 정리해 줍니다. 이 페이지 안에서만 동작하고
-    어디로도 전송되지 않으므로, 인터넷이 없는 내부망(인트라넷) PC에서도
-    파일을 그대로 열어 사용할 수 있습니다.
+    개발자 도구에서 하나씩 복사한 질문/답변 코드를 아래에 붙여넣고 <b>목록에 추가</b>하세요.
+    여러 개를 계속 추가한 뒤, 한 번에 정리된 결과 하나로 모아서 복사·다운로드할 수 있습니다.
+    전부 이 페이지 안에서만 처리되고 어디로도 전송되지 않으므로, 인터넷이 없는
+    내부망(인트라넷) PC에서도 파일을 그대로 열어 사용할 수 있습니다.
   </p>
 
   <div class="card">
@@ -82,20 +112,31 @@
   </div>
 
   <div class="card">
-    <h2>2. 아래에 붙여넣고 정리하기</h2>
+    <h2>2. 붙여넣고 목록에 추가하기</h2>
+    <input type="text" id="label-input" placeholder="이 항목 이름(선택 — 예: 질문 제목이나 번호. 비워두면 자동으로 번호가 붙습니다)">
     <textarea id="raw-input" placeholder="여기에 복사한 코드를 붙여넣으세요 (Ctrl+V)"></textarea>
     <div class="actions">
-      <button class="primary" id="format-btn">코드 정리하기</button>
-      <button class="secondary" id="clear-btn">지우기</button>
+      <button class="primary" id="add-btn">+ 목록에 추가</button>
+      <button class="secondary" id="clear-input-btn">입력창 지우기</button>
     </div>
   </div>
 
   <div class="card">
-    <h2>3. 정리된 결과</h2>
-    <textarea id="formatted-output" readonly placeholder="정리 버튼을 누르면 여기에 결과가 나타납니다"></textarea>
+    <h2>3. 모은 목록</h2>
+    <div class="actions" style="margin-top:0;">
+      <span class="count" id="entry-count" style="margin-left:0;">0개 모음</span>
+      <button class="danger" id="clear-all-btn">전체 삭제</button>
+    </div>
+    <p class="empty-hint" id="empty-hint">아직 추가한 항목이 없습니다. 위에서 코드를 붙여넣고 추가해 보세요.</p>
+    <ul id="entry-list"></ul>
+  </div>
+
+  <div class="card">
+    <h2>4. 전체 결과 (모은 항목 전부)</h2>
+    <textarea id="combined-output" readonly placeholder="항목을 추가하면 여기에 전부 이어서 정리됩니다"></textarea>
     <div class="actions">
-      <button class="secondary" id="copy-btn">결과 복사</button>
-      <button class="secondary" id="download-btn">파일로 다운로드</button>
+      <button class="secondary" id="copy-all-btn">전체 복사</button>
+      <button class="secondary" id="download-all-btn">전체 파일로 다운로드</button>
     </div>
   </div>
 
@@ -103,8 +144,8 @@
     붙여넣은 내용이 <code>{ }</code>/<code>[ ]</code> 로 시작하는 JSON이면 자동으로
     JSON으로, 아니면 HTML 태그 구조로 인식해 줄바꿈·들여쓰기를 정리합니다.
     <code>&lt;script&gt;</code>/<code>&lt;style&gt;</code> 안쪽 내용은 태그로
-    잘못 잘리지 않도록 통째로 다룹니다. 입력 내용은 어디로도 전송되지 않고
-    이 브라우저 탭 안에서만 처리됩니다.
+    잘못 잘리지 않도록 통째로 다룹니다. 모은 목록은 이 브라우저에만 저장되며
+    (다른 곳으로 전송되지 않음), 탭을 닫아도 같은 파일을 다시 열면 남아 있습니다.
   </p>
 </main>
 <script>
@@ -116,6 +157,7 @@
     "link", "meta", "param", "source", "track", "wbr",
   ];
   var RAW_TEXT_TAGS = ["script", "style"];
+  var STORAGE_KEY = "qna_collector_entries_v1";
 
   function indent(n) {
     return "  ".repeat(n);
@@ -194,52 +236,158 @@
     return { type: "html", text: formatHtml(text) };
   }
 
-  var input = document.getElementById("raw-input");
-  var output = document.getElementById("formatted-output");
-  var outputType = "html";
+  function escapeHtmlText(str) {
+    return str
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
 
-  document.getElementById("format-btn").addEventListener("click", function () {
-    var result = formatInput(input.value);
-    output.value = result.text;
-    outputType = result.type;
+  var labelInput = document.getElementById("label-input");
+  var rawInput = document.getElementById("raw-input");
+  var entryList = document.getElementById("entry-list");
+  var entryCount = document.getElementById("entry-count");
+  var emptyHint = document.getElementById("empty-hint");
+  var combinedOutput = document.getElementById("combined-output");
+
+  var entries = loadEntries();
+
+  function loadEntries() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function saveEntries() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+    } catch (e) {
+      // localStorage를 쓸 수 없는 환경이면 조용히 무시하고 메모리에서만 유지한다.
+    }
+  }
+
+  function render() {
+    entryList.innerHTML = "";
+    entryCount.textContent = entries.length + "개 모음";
+    emptyHint.style.display = entries.length === 0 ? "block" : "none";
+
+    entries.forEach(function (entry, index) {
+      var li = document.createElement("li");
+      var details = document.createElement("details");
+      details.className = "entry";
+
+      var summary = document.createElement("summary");
+
+      var titleSpan = document.createElement("span");
+      titleSpan.textContent = (index + 1) + ". " + (entry.label || "항목 " + (index + 1));
+      summary.appendChild(titleSpan);
+
+      var badge = document.createElement("span");
+      badge.className = "badge";
+      badge.textContent = entry.type === "json" ? "JSON" : "HTML";
+      summary.appendChild(badge);
+
+      var removeBtn = document.createElement("button");
+      removeBtn.className = "remove-entry";
+      removeBtn.textContent = "삭제";
+      removeBtn.addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        entries.splice(index, 1);
+        saveEntries();
+        render();
+      });
+      summary.appendChild(removeBtn);
+
+      details.appendChild(summary);
+
+      var pre = document.createElement("pre");
+      pre.textContent = entry.text;
+      details.appendChild(pre);
+
+      li.appendChild(details);
+      entryList.appendChild(li);
+    });
+
+    var combined = entries
+      .map(function (entry, index) {
+        var header = "===== " + (index + 1) + ". " + (entry.label || "항목 " + (index + 1)) +
+          " (" + entry.type.toUpperCase() + ") =====";
+        return header + "\n" + entry.text;
+      })
+      .join("\n\n");
+    combinedOutput.value = combined;
+  }
+
+  document.getElementById("add-btn").addEventListener("click", function () {
+    var raw = rawInput.value;
+    if (!raw.trim()) return;
+    var result = formatInput(raw);
+    entries.push({
+      label: labelInput.value.trim(),
+      type: result.type,
+      text: result.text,
+    });
+    saveEntries();
+    render();
+    labelInput.value = "";
+    rawInput.value = "";
+    rawInput.focus();
   });
 
-  document.getElementById("clear-btn").addEventListener("click", function () {
-    input.value = "";
-    output.value = "";
-    input.focus();
+  document.getElementById("clear-input-btn").addEventListener("click", function () {
+    labelInput.value = "";
+    rawInput.value = "";
+    rawInput.focus();
   });
 
-  document.getElementById("copy-btn").addEventListener("click", function (e) {
-    var text = output.value;
+  document.getElementById("clear-all-btn").addEventListener("click", function () {
+    if (entries.length === 0) return;
+    if (!confirm("모은 " + entries.length + "개 항목을 전부 삭제할까요?")) return;
+    entries = [];
+    saveEntries();
+    render();
+  });
+
+  function copyText(text, btn) {
     function fallback() {
-      output.removeAttribute("readonly");
-      output.focus();
-      output.select();
+      var ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
       try { document.execCommand("copy"); } catch (err) {}
-      output.setAttribute("readonly", "readonly");
+      document.body.removeChild(ta);
     }
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(text).catch(fallback);
     } else {
       fallback();
     }
-    var btn = e.currentTarget;
     var original = btn.textContent;
     btn.textContent = "복사됨!";
     setTimeout(function () { btn.textContent = original; }, 1200);
+  }
+
+  document.getElementById("copy-all-btn").addEventListener("click", function (e) {
+    copyText(combinedOutput.value, e.currentTarget);
   });
 
-  document.getElementById("download-btn").addEventListener("click", function () {
-    var isJson = outputType === "json";
-    var blob = new Blob([output.value], { type: isJson ? "application/json" : "text/html" });
+  document.getElementById("download-all-btn").addEventListener("click", function () {
+    var blob = new Blob([combinedOutput.value], { type: "text/plain;charset=utf-8" });
     var a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = isJson ? "formatted-data.json" : "formatted-page.html";
+    a.download = "qna-collected.txt";
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
   });
+
+  render();
 })();
 </script>
 </body>
