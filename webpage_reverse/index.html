@@ -17,6 +17,7 @@
     textarea, input[type="text"] { background: #1e1e1e !important; color: #d4d4d4 !important; border-color: #444 !important; }
     .entry { background: #232323 !important; border-color: #3c3c3c !important; }
     .entry summary { color: #e0e0e0 !important; }
+    .raw-details { border-top-color: #3c3c3c !important; }
   }
   main { max-width: 860px; margin: 0 auto; }
   h1 { font-size: 22px; margin-bottom: 4px; }
@@ -32,9 +33,9 @@
     font-size: 12px; padding: 8px 10px; border: 1px solid #ccc; border-radius: 6px;
     background: #fafafa; color: #333;
   }
-  textarea { resize: vertical; white-space: pre; }
+  textarea { resize: vertical; white-space: pre-wrap; word-break: break-word; }
   input[type="text"] { font-family: inherit; font-size: 13px; margin-bottom: 8px; }
-  #raw-input { height: 180px; }
+  #raw-input { height: 180px; white-space: pre; word-break: normal; }
   #combined-output { height: 260px; }
   .actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; align-items: center; }
   button {
@@ -63,14 +64,26 @@
     font-size: 11px; font-weight: 400; color: #888; background: rgba(127,127,127,.15);
     padding: 1px 6px; border-radius: 4px;
   }
+  .entry summary .badge.guessed { color: #1a7a3a; background: rgba(40,160,80,.15); }
+  .entry summary .badge.fallback { color: #a35b00; background: rgba(200,130,0,.15); }
   .entry summary .remove-entry {
     margin-left: auto; background: none; border: none; color: #a33; font-size: 12px;
     font-weight: 600; cursor: pointer; padding: 2px 6px;
   }
-  .entry pre {
+  .entry .readable {
     margin: 0; padding: 12px 14px; border-top: 1px solid #e0e0e0;
-    font-family: Consolas, "D2Coding", monospace; font-size: 12px; white-space: pre-wrap;
-    word-break: break-all; max-height: 320px; overflow: auto;
+    font-size: 13px; white-space: pre-wrap; word-break: break-word;
+  }
+  .raw-details {
+    margin: 0 14px 12px; border-top: 1px dashed #ddd; padding-top: 8px;
+  }
+  .raw-details summary {
+    cursor: pointer; font-size: 12px; color: #888; padding: 2px 0;
+  }
+  .raw-details pre {
+    margin: 6px 0 0; font-family: Consolas, "D2Coding", monospace; font-size: 11px;
+    white-space: pre-wrap; word-break: break-all; max-height: 260px; overflow: auto;
+    color: #999;
   }
   .empty-hint { color: #999; font-size: 13px; padding: 8px 0; }
 </style>
@@ -80,9 +93,10 @@
   <h1>Q&amp;A 취합 정리 도구</h1>
   <p class="lead">
     개발자 도구에서 하나씩 복사한 질문/답변 코드를 아래에 붙여넣고 <b>목록에 추가</b>하세요.
-    여러 개를 계속 추가한 뒤, 한 번에 정리된 결과 하나로 모아서 복사·다운로드할 수 있습니다.
-    전부 이 페이지 안에서만 처리되고 어디로도 전송되지 않으므로, 인터넷이 없는
-    내부망(인트라넷) PC에서도 파일을 그대로 열어 사용할 수 있습니다.
+    태그·JSON 키 같은 코드는 걷어내고, 그 안에 섞여 있는 실제 글 내용만 뽑아
+    가능하면 <b>질문 / 답변</b>으로 나눠서 정리합니다. 자동 인식이 안 맞을 수 있어
+    항목마다 원본 코드도 접어서 함께 보여줍니다. 전부 이 페이지 안에서만 처리되고
+    어디로도 전송되지 않으므로 내부망(인트라넷) PC에서도 그대로 사용할 수 있습니다.
   </p>
 
   <div class="card">
@@ -141,11 +155,13 @@
   </div>
 
   <p class="note">
-    붙여넣은 내용이 <code>{ }</code>/<code>[ ]</code> 로 시작하는 JSON이면 자동으로
-    JSON으로, 아니면 HTML 태그 구조로 인식해 줄바꿈·들여쓰기를 정리합니다.
-    <code>&lt;script&gt;</code>/<code>&lt;style&gt;</code> 안쪽 내용은 태그로
-    잘못 잘리지 않도록 통째로 다룹니다. 모은 목록은 이 브라우저에만 저장되며
-    (다른 곳으로 전송되지 않음), 탭을 닫아도 같은 파일을 다시 열면 남아 있습니다.
+    JSON 응답은 <code>제목/내용/답변</code> 처럼 보이는 필드(예: <code>nttSj</code>,
+    <code>nttCn</code>, <code>answerCn</code> 같은 흔한 게시판 필드명)를 찾아
+    <b>[질문 제목] / [질문 내용] / [답변]</b> 으로 나눠 보여주고, 못 찾으면 발견된
+    텍스트를 전부 나열합니다. HTML은 태그를 걷어내 읽히는 글자만 남기고,
+    화면에 "질문"/"답변"이라는 표시가 있으면 그 기준으로 나눕니다. 자동 인식은
+    사이트마다 다를 수 있어 100% 정확하지 않으니, 항목의 <b>원본 코드 보기</b>로
+    항상 확인할 수 있게 남겨둡니다.
   </p>
 </main>
 <script>
@@ -157,7 +173,7 @@
     "link", "meta", "param", "source", "track", "wbr",
   ];
   var RAW_TEXT_TAGS = ["script", "style"];
-  var STORAGE_KEY = "qna_collector_entries_v1";
+  var STORAGE_KEY = "qna_collector_entries_v2";
 
   function indent(n) {
     return "  ".repeat(n);
@@ -228,19 +244,147 @@
     var trimmed = text.trim();
     if (/^[{[]/.test(trimmed)) {
       try {
-        return { type: "json", text: JSON.stringify(JSON.parse(trimmed), null, 2) };
+        return { type: "json", raw: JSON.stringify(JSON.parse(trimmed), null, 2), parsed: JSON.parse(trimmed) };
       } catch (e) {
         // JSON 파싱에 실패하면 HTML/일반 텍스트로 취급한다.
       }
     }
-    return { type: "html", text: formatHtml(text) };
+    return { type: "html", raw: formatHtml(text), parsed: null };
   }
 
-  function escapeHtmlText(str) {
-    return str
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;");
+  // HTML 태그를 걷어내고 사람이 읽을 글자만 남긴다. DOM에 넣지 않고 순수 문자열
+  // 치환만 하므로, 붙여넣은 내용 안에 악성 코드가 있어도 실행되지 않는다.
+  function stripHtmlToText(html) {
+    var noRaw = html
+      .replace(/<script[\s\S]*?<\/script>/gi, " ")
+      .replace(/<style[\s\S]*?<\/style>/gi, " ");
+    var withBreaks = noRaw.replace(/<\/?(br|p|div|li|tr|h[1-6])\b[^>]*>/gi, "\n");
+    var textOnly = withBreaks.replace(/<[^>]+>/g, "");
+    var decoded = textOnly
+      .replace(/&nbsp;/gi, " ")
+      .replace(/&lt;/gi, "<")
+      .replace(/&gt;/gi, ">")
+      .replace(/&quot;/gi, "\"")
+      .replace(/&#39;/gi, "'")
+      .replace(/&amp;/gi, "&");
+    return decoded
+      .split("\n")
+      .map(function (line) { return line.trim(); })
+      .filter(function (line) { return line.length > 0; })
+      .join("\n");
+  }
+
+  function tokenizeKey(key) {
+    return key
+      .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+      .replace(/[_\-.]/g, " ")
+      .toLowerCase()
+      .split(/\s+/)
+      .filter(Boolean);
+  }
+
+  var TITLE_TOKENS = ["title", "subject", "subj", "sj", "ttl", "제목"];
+  var ANSWER_TOKENS = ["answer", "reply", "response", "ans", "답변"];
+  var CONTENT_TOKENS = ["content", "contents", "cn", "body", "memo", "text", "내용"];
+
+  function classifyKey(lastSegment) {
+    var tokens = tokenizeKey(lastSegment);
+    if (tokens.some(function (t) { return ANSWER_TOKENS.indexOf(t) !== -1; })) return "answer";
+    if (tokens.some(function (t) { return TITLE_TOKENS.indexOf(t) !== -1; })) return "title";
+    if (tokens.some(function (t) { return CONTENT_TOKENS.indexOf(t) !== -1; })) return "content";
+    return null;
+  }
+
+  // JSON 객체를 훑어 문자열 값을 전부 모으고, 필드명으로 제목/내용/답변을 추정한다.
+  function extractFromJson(obj) {
+    var fields = [];
+    (function walk(node, path) {
+      if (node == null) return;
+      if (typeof node === "string") {
+        var trimmed = node.trim();
+        var looksLikeId = /^-?\d+(\.\d+)?$/.test(trimmed) || /^\d{4}-\d{2}-\d{2}/.test(trimmed);
+        if (trimmed.length >= 2 && !looksLikeId) {
+          fields.push({ path: path, value: trimmed });
+        }
+        return;
+      }
+      if (Array.isArray(node)) {
+        node.forEach(function (item, i) { walk(item, path + "[" + i + "]"); });
+        return;
+      }
+      if (typeof node === "object") {
+        Object.keys(node).forEach(function (key) {
+          walk(node[key], path ? path + "." + key : key);
+        });
+      }
+    })(obj, "");
+
+    var buckets = { title: [], content: [], answer: [] };
+    fields.forEach(function (f) {
+      var lastSegment = f.path.split(/[.\[]/).pop().replace(/\]$/, "");
+      var cat = classifyKey(lastSegment);
+      if (cat) buckets[cat].push(f);
+    });
+
+    var title = buckets.title[0];
+    var content = buckets.content.filter(function (c) { return !title || c.path !== title.path; })[0];
+    var answer = buckets.answer[0];
+
+    var lines = [];
+    if (title) lines.push("[질문 제목]\n" + title.value);
+    if (content) lines.push("[질문 내용]\n" + stripHtmlToText(content.value));
+    if (answer) lines.push("[답변]\n" + stripHtmlToText(answer.value));
+
+    if (lines.length > 0) {
+      return { text: lines.join("\n\n"), guessed: true };
+    }
+
+    if (fields.length === 0) {
+      return { text: "(텍스트로 보이는 값을 찾지 못했습니다. 원본 코드를 확인해 주세요.)", guessed: false };
+    }
+    var fallback = ["(질문/답변 필드를 자동으로 찾지 못했습니다. 발견된 텍스트 전체입니다)"]
+      .concat(fields.slice(0, 40).map(function (f) { return f.path + ": " + f.value; }));
+    return { text: fallback.join("\n"), guessed: false };
+  }
+
+  var Q_MARKER_RE = /^(질문|문의\s*내용|질의\s*내용|Q\.?)$/;
+  var A_MARKER_RE = /^(답변|답변\s*내용|회신\s*내용|A\.?)$/;
+
+  // 화면에 "질문"/"답변" 같은 표시가 그대로 텍스트로 남아있으면 그 기준으로 나눈다.
+  function splitQnaMarkers(plainText) {
+    var lines = plainText.split("\n");
+    var qIdx = -1, aIdx = -1;
+    lines.forEach(function (line, i) {
+      var t = line.trim();
+      if (qIdx === -1 && Q_MARKER_RE.test(t)) qIdx = i;
+      if (A_MARKER_RE.test(t)) aIdx = i;
+    });
+    if (qIdx === -1 && aIdx === -1) return null;
+    var question = qIdx !== -1
+      ? lines.slice(qIdx + 1, aIdx !== -1 ? aIdx : undefined).join("\n").trim()
+      : null;
+    var answer = aIdx !== -1 ? lines.slice(aIdx + 1).join("\n").trim() : null;
+    return { question: question, answer: answer };
+  }
+
+  function extractFromHtml(rawHtmlText) {
+    var plain = stripHtmlToText(rawHtmlText);
+    if (!plain) {
+      return { text: "(텍스트를 찾지 못했습니다. 원본 코드를 확인해 주세요.)", guessed: false };
+    }
+    var split = splitQnaMarkers(plain);
+    if (split && (split.question || split.answer)) {
+      var lines = [];
+      if (split.question) lines.push("[질문]\n" + split.question);
+      if (split.answer) lines.push("[답변]\n" + split.answer);
+      return { text: lines.join("\n\n"), guessed: true };
+    }
+    return { text: "[내용]\n" + plain, guessed: false };
+  }
+
+  function buildReadable(result) {
+    if (result.type === "json") return extractFromJson(result.parsed);
+    return extractFromHtml(result.raw);
   }
 
   var labelInput = document.getElementById("label-input");
@@ -278,6 +422,7 @@
       var li = document.createElement("li");
       var details = document.createElement("details");
       details.className = "entry";
+      details.open = true;
 
       var summary = document.createElement("summary");
 
@@ -286,8 +431,9 @@
       summary.appendChild(titleSpan);
 
       var badge = document.createElement("span");
-      badge.className = "badge";
-      badge.textContent = entry.type === "json" ? "JSON" : "HTML";
+      badge.className = "badge" + (entry.guessed ? " guessed" : " fallback");
+      badge.textContent = (entry.type === "json" ? "JSON" : "HTML") +
+        (entry.guessed ? " · 질문/답변 인식됨" : " · 자동 인식 실패");
       summary.appendChild(badge);
 
       var removeBtn = document.createElement("button");
@@ -304,9 +450,20 @@
 
       details.appendChild(summary);
 
-      var pre = document.createElement("pre");
-      pre.textContent = entry.text;
-      details.appendChild(pre);
+      var readablePre = document.createElement("pre");
+      readablePre.className = "readable";
+      readablePre.textContent = entry.readable;
+      details.appendChild(readablePre);
+
+      var rawDetails = document.createElement("details");
+      rawDetails.className = "raw-details";
+      var rawSummary = document.createElement("summary");
+      rawSummary.textContent = "원본 코드 보기";
+      rawDetails.appendChild(rawSummary);
+      var rawPre = document.createElement("pre");
+      rawPre.textContent = entry.raw;
+      rawDetails.appendChild(rawPre);
+      details.appendChild(rawDetails);
 
       li.appendChild(details);
       entryList.appendChild(li);
@@ -314,9 +471,8 @@
 
     var combined = entries
       .map(function (entry, index) {
-        var header = "===== " + (index + 1) + ". " + (entry.label || "항목 " + (index + 1)) +
-          " (" + entry.type.toUpperCase() + ") =====";
-        return header + "\n" + entry.text;
+        var header = "===== " + (index + 1) + ". " + (entry.label || "항목 " + (index + 1)) + " =====";
+        return header + "\n" + entry.readable;
       })
       .join("\n\n");
     combinedOutput.value = combined;
@@ -326,10 +482,13 @@
     var raw = rawInput.value;
     if (!raw.trim()) return;
     var result = formatInput(raw);
+    var readable = buildReadable(result);
     entries.push({
       label: labelInput.value.trim(),
       type: result.type,
-      text: result.text,
+      raw: result.raw,
+      readable: readable.text,
+      guessed: readable.guessed,
     });
     saveEntries();
     render();
