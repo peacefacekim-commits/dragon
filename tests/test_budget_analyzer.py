@@ -30,8 +30,9 @@ from budget_analyzer.template import (  # noqa: E402
     save_template,
     template_from_mapping,
 )
+from budget_analyzer import forecast as forecast_module  # noqa: E402
 from budget_analyzer.xlsx_reader import SpreadsheetError, read_table, sheet_names  # noqa: E402
-from budget_analyzer.xlsx_writer import write_csv, write_xlsx  # noqa: E402
+from budget_analyzer.xlsx_writer import Formula, write_csv, write_xlsx  # noqa: E402
 
 
 def sample_table() -> Table:
@@ -557,7 +558,91 @@ class TestEngine(unittest.TestCase):
         self.assertTrue(any("망함" in w for w in result.warnings))
 
 
+def _write_raw_xlsx_with_date_style_overflow(path: str) -> None:
+    """실제로 부딪혔던 상황을 그대로 재현한다: 셀에는 '날짜 서식'이 걸려 있는데
+    값은 (예산 금액처럼) 날짜로 변환하면 오버플로가 나는 아주 큰 숫자인 경우.
+    write_xlsx 는 파이썬 타입에 따라 서식을 고르므로 이런 조합을 만들 수 없어,
+    xlsx 내부 XML을 직접 손으로 구성한다.
+    """
+    import zipfile
+
+    content_types = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+        '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+        '<Default Extension="xml" ContentType="application/xml"/>'
+        '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+        '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'
+        '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+        "</Types>"
+    )
+    root_rels = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>'
+        "</Relationships>"
+    )
+    workbook = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
+        'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+        '<sheets><sheet name="sheet" sheetId="1" r:id="rId1"/></sheets>'
+        "</workbook>"
+    )
+    workbook_rels = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>'
+        '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>'
+        "</Relationships>"
+    )
+    # cellXfs 의 1번 인덱스(position 1)가 내장 날짜 서식(numFmtId=14)을 쓰도록 만든다.
+    styles = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+        '<cellXfs count="2">'
+        '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
+        '<xf numFmtId="14" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>'
+        "</cellXfs>"
+        "</styleSheet>"
+    )
+    # A1: 정상적인 날짜(2026-05-04 == 시리얼 46143). B1: 날짜 서식이 걸려 있지만
+    # 값은 예산 금액 같은 매우 큰 수(시리얼로 바꾸면 datetime 이 표현할 수 있는 범위를 넘어선다).
+    sheet = (
+        '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+        "<sheetData>"
+        '<row r="1"><c r="A1" t="inlineStr"><is><t>목</t></is></c>'
+        '<c r="B1" t="inlineStr"><is><t>금액</t></is></c></row>'
+        '<row r="2"><c r="A2" s="1"><v>46146</v></c>'
+        '<c r="B2" s="1"><v>6699009873</v></c></row>'
+        "</sheetData></worksheet>"
+    )
+
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("[Content_Types].xml", content_types)
+        archive.writestr("_rels/.rels", root_rels)
+        archive.writestr("xl/workbook.xml", workbook)
+        archive.writestr("xl/_rels/workbook.xml.rels", workbook_rels)
+        archive.writestr("xl/styles.xml", styles)
+        archive.writestr("xl/worksheets/sheet1.xml", sheet)
+
+
 class TestSpreadsheetRoundTrip(unittest.TestCase):
+    def test_date_style_on_oversized_number_falls_back_to_plain_number(self):
+        """실제 업로드 파일에서 'Python int too large to convert to C int' 로 죽던 사례.
+
+        예산 금액 셀에 날짜 서식이 잘못 걸려 있어도, 날짜로 바꾸면 오버플로가 나는
+        값이면 조용히 숫자로 읽어야지 예외를 던지면 안 된다.
+        """
+        with tempfile.TemporaryDirectory() as folder:
+            path = os.path.join(folder, "overflow.xlsx")
+            _write_raw_xlsx_with_date_style_overflow(path)
+            table = read_table(path)
+
+        self.assertEqual(table.rows[0][0], dt.date(2026, 5, 4))  # 진짜 날짜는 그대로 날짜로
+        self.assertEqual(table.rows[0][1], 6699009873)  # 오버플로 나는 값은 숫자로 대체
+
     def test_xlsx_write_then_read(self):
         source = Table(
             ["항목", "금액", "일자", "비율"],
@@ -845,6 +930,198 @@ class TestSampleTemplate(unittest.TestCase):
         result = run(table, template, source="테스트")
         self.assertTrue(result.blocks)
         self.assertIn("<!DOCTYPE html>", report.render_report(result))
+
+
+class TestForecast(unittest.TestCase):
+    """집행 전망(작년 동기간 패턴 + 가중치) 계산과 산출 엑셀 구조를 검증한다."""
+
+    def history_table(self) -> Table:
+        return Table(
+            ["원인행위일자", "원인행위금액", "목코드", "세목코드"],
+            [
+                # 210/01: 기준일까지 1000, 동기간(8/11~9/30)에 500 더 씀 -> 비율 0.5
+                ["2025-01-01", 1000, "210", "01"],
+                ["2025-09-01", 500, "210", "01"],
+                # 220/02: 기준일까지 2000, 동기간엔 추가 지출 없음 -> 비율 0
+                ["2025-02-01", 2000, "220", "02"],
+                # 기준일 이후(작년 목표일 지남)에 벌어진 지출은 제외되어야 한다
+                ["2025-11-01", 9999, "210", "01"],
+            ],
+            name="원인행위상세목록",
+        )
+
+    def current_table(self) -> Table:
+        return Table(
+            ["회계", "목", "세목", "26년예산", "8.10. 현재 집행", "3분기까지 집행 전망(누계액)"],
+            [
+                ["[총계]", None, None, 10000, 3900, 0],
+                ["[11]일반회계", "[210]운영비", "[01]일반수용비", 5000, 3000, None],
+                ["[11]일반회계", "[220]여비", "[02]국내여비", 4000, 800, None],
+                ["[11]일반회계", "[230]업무추진비", "[03]사업추진비", 1000, 100, None],  # 작년 실적 없음 -> 전체 평균 대체
+            ],
+            name="현황",
+        )
+
+    def build(self, **overrides):
+        settings = forecast_module.ForecastSettings(
+            base_date=dt.date(2026, 8, 10),
+            target_date=dt.date(2026, 9, 30),
+            weight_percent=overrides.pop("weight_percent", 100.0),
+        )
+        return forecast_module.build_forecast(self.history_table(), self.current_table(), settings, **overrides)
+
+    def test_extract_code_strips_bracket_prefix(self):
+        self.assertEqual(forecast_module._extract_code("[220]여비"), "220")
+        self.assertEqual(forecast_module._extract_code("맨텍스트"), "맨텍스트")
+        self.assertEqual(forecast_module._extract_code(None), "")
+
+    def test_end_of_quarter(self):
+        self.assertEqual(forecast_module.end_of_quarter(dt.date(2026, 8, 10)), dt.date(2026, 9, 30))
+        self.assertEqual(forecast_module.end_of_quarter(dt.date(2026, 1, 1)), dt.date(2026, 3, 31))
+        self.assertEqual(forecast_module.end_of_quarter(dt.date(2026, 12, 31)), dt.date(2026, 12, 31))
+
+    def test_settings_reject_target_before_base(self):
+        with self.assertRaises(forecast_module.ForecastError):
+            forecast_module.ForecastSettings(base_date=dt.date(2026, 8, 10), target_date=dt.date(2026, 1, 1))
+
+    def test_settings_derive_last_year_window(self):
+        settings = forecast_module.ForecastSettings(base_date=dt.date(2026, 8, 10), target_date=dt.date(2026, 9, 30))
+        self.assertEqual(settings.history_base_date, dt.date(2025, 8, 10))
+        self.assertEqual(settings.history_target_date, dt.date(2025, 9, 30))
+
+    def test_matched_and_unmatched_counts(self):
+        result = self.build()
+        self.assertEqual(result.matched_rows, 2)
+        self.assertEqual(result.unmatched_rows, 1)
+        self.assertTrue(result.warnings)
+
+    def test_ratio_column_matches_hand_calculated_values(self):
+        result = self.build()
+        ratio_idx = result.table.index_of("작년동기간증감율(%)")
+        item_idx = result.table.index_of("목")
+
+        by_item = {row[item_idx]: row[ratio_idx] for row in result.table.rows}
+        # 퍼센트 서식 컬럼이라 값 자체는 분수로 저장된다 (0.5 == 50%, report.py 의 '비율' 관례와 동일).
+        self.assertAlmostEqual(by_item["[210]운영비"], 0.5)
+        self.assertAlmostEqual(by_item["[220]여비"], 0.0)
+        # 전체 평균 = (500) / (1000 + 2000) = 16.67%
+        self.assertAlmostEqual(by_item["[230]업무추진비"], 0.1667, places=3)
+        self.assertAlmostEqual(result.overall_ratio, 0.1667, places=3)
+
+    def test_detail_rows_get_formulas_referencing_same_row(self):
+        result = self.build()
+        table = result.table
+        exec_idx = table.index_of("8.10. 현재 집행")
+        target_idx = table.index_of("3분기까지 집행 전망(누계액)")
+        increase_idx = table.index_of("가중치적용_예상증가액")
+
+        exec_letter = forecast_module._column_letter(exec_idx)
+        increase_letter = forecast_module._column_letter(increase_idx)
+
+        # 2번째 행(총계 다음)이 [210]운영비 -> 엑셀 행 번호는 3
+        row = table.rows[1]
+        self.assertIsInstance(row[target_idx], Formula)
+        self.assertEqual(str(row[target_idx]), f"={exec_letter}3+{increase_letter}3")
+        self.assertIsInstance(row[increase_idx], Formula)
+        self.assertIn("'설정'!$B$6", str(row[increase_idx]))
+
+    def test_total_row_sums_detail_rows_instead_of_using_its_own_ratio(self):
+        result = self.build()
+        table = result.table
+        target_idx = table.index_of("3분기까지 집행 전망(누계액)")
+        increase_idx = table.index_of("가중치적용_예상증가액")
+
+        total_row = table.rows[0]
+        self.assertEqual(total_row[0], "[총계]")
+        self.assertIsInstance(total_row[target_idx], Formula)
+        self.assertTrue(str(total_row[target_idx]).startswith("=SUM("))
+        self.assertIsInstance(total_row[increase_idx], Formula)
+        self.assertIsNone(total_row[table.index_of("작년동기간증감율(%)")])
+
+    def test_forecast_rate_column_present_when_budget_column_found(self):
+        result = self.build()
+        self.assertIn("전망집행률(%)", result.table.columns)
+
+    def test_weight_percent_is_stored_for_settings_sheet(self):
+        result = self.build(weight_percent=80.0)
+        self.assertEqual(result.settings.weight_percent, 80.0)
+
+    def test_history_amounts_after_target_date_are_excluded(self):
+        # 2025-11-01 의 9999 는 작년 목표일(9/30) 이후라 비율 계산에 들어가면 안 된다.
+        result = self.build()
+        ratio_idx = result.table.index_of("작년동기간증감율(%)")
+        item_idx = result.table.index_of("목")
+        by_item = {row[item_idx]: row[ratio_idx] for row in result.table.rows}
+        self.assertAlmostEqual(by_item["[210]운영비"], 0.5)
+
+    def test_unknown_override_column_raises_clear_error(self):
+        settings = forecast_module.ForecastSettings(base_date=dt.date(2026, 8, 10), target_date=dt.date(2026, 9, 30))
+        with self.assertRaises(forecast_module.ForecastError):
+            forecast_module.build_forecast(
+                self.history_table(), self.current_table(), settings, current_exec_column="없는컬럼"
+            )
+
+    def test_write_forecast_produces_settings_and_data_sheets(self):
+        result = self.build(weight_percent=100.0)
+        with tempfile.TemporaryDirectory() as folder:
+            path = os.path.join(folder, "전망.xlsx")
+            forecast_module.write_forecast(path, result)
+            self.assertEqual(sheet_names(path), ["설정", "집행전망"])
+
+            settings_table = read_table(path, sheet="설정")
+            rows = {row[0]: row[1] for row in settings_table.rows}
+            self.assertEqual(rows["가중치(%)"], 100)
+            self.assertEqual(rows["기준일(올해)"], dt.date(2026, 8, 10))
+
+    def test_ratio_and_rate_columns_use_percent_style_not_double_scaled(self):
+        """xlsx_writer 는 컬럼 이름에 '율'·'%' 가 있으면 자동으로 0.00% 서식을 입힌다.
+        그러니 셀 값 자체는 분수여야 한다 — 50 을 넣으면 화면에 '5000.00%' 로 곱절
+        스케일링되어 버린다."""
+        result = self.build()
+        with tempfile.TemporaryDirectory() as folder:
+            path = os.path.join(folder, "전망.xlsx")
+            forecast_module.write_forecast(path, result)
+            import zipfile
+
+            with zipfile.ZipFile(path) as archive:
+                xml = archive.read("xl/worksheets/sheet2.xml").decode("utf-8")
+
+        ratio_idx = result.table.index_of("작년동기간증감율(%)")
+        rate_idx = result.table.index_of("전망집행률(%)")
+        ratio_letter = forecast_module._column_letter(ratio_idx)
+        rate_letter = forecast_module._column_letter(rate_idx)
+        # [210]운영비 행은 엑셀 행 3, 값은 0.5 (=50%) 이어야 하고 퍼센트 스타일(s="3")이어야 한다.
+        self.assertIn(f'<c r="{ratio_letter}3" s="3"><v>0.5</v></c>', xml)
+        self.assertIn(f'{rate_letter}3" s="3"><f>IF(', xml)
+
+    def test_cli_forecast_flag_runs_end_to_end(self):
+        from budget_analyzer.cli import main
+
+        with tempfile.TemporaryDirectory() as folder:
+            history_path = os.path.join(folder, "작년.xlsx")
+            current_path = os.path.join(folder, "올해.xlsx")
+            out_path = os.path.join(folder, "결과.xlsx")
+            write_xlsx(history_path, [self.history_table()])
+            write_xlsx(current_path, [self.current_table()])
+
+            code = main([current_path, "--전망", history_path, "--xlsx", out_path])
+            self.assertEqual(code, 0)
+            self.assertTrue(os.path.exists(out_path))
+            self.assertEqual(sheet_names(out_path), ["설정", "집행전망"])
+
+
+class TestXlsxWriterFormula(unittest.TestCase):
+    def test_formula_cell_is_written_as_formula_not_value(self):
+        table = Table(["a", "b"], [[1, Formula("=A1*2")]], name="t")
+        with tempfile.TemporaryDirectory() as folder:
+            path = os.path.join(folder, "f.xlsx")
+            write_xlsx(path, [table])
+            import zipfile
+
+            with zipfile.ZipFile(path) as archive:
+                xml = archive.read("xl/worksheets/sheet1.xml").decode("utf-8")
+            self.assertIn("<f>A1*2</f>", xml)
+            self.assertNotIn("<v>A1*2</v>", xml)
 
 
 if __name__ == "__main__":

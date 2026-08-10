@@ -216,9 +216,15 @@ class _Workbook:
             return raw
 
         style = cell.get("s")
-        if style is not None and int(style) in self.date_styles and number > 0:
-            moment = _serial_to_datetime(number, self.epoch)
-            return moment.date() if moment.time() == _dt.time(0, 0) else moment
+        if style is not None and int(style) in self.date_styles and 0 < number < 2958466:
+            # 상한은 엑셀 날짜 체계의 최댓값(9999-12-31). 날짜 서식이 걸린 셀이라도
+            # 실제 값이 금액처럼 그 범위를 벗어나면 날짜가 아니라 숫자로 취급한다.
+            try:
+                moment = _serial_to_datetime(number, self.epoch)
+            except (OverflowError, OSError, ValueError):
+                pass
+            else:
+                return moment.date() if moment.time() == _dt.time(0, 0) else moment
 
         return int(number) if number.is_integer() else number
 

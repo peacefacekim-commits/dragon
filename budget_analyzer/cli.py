@@ -7,6 +7,7 @@ import os
 import sys
 
 from . import expression
+from . import forecast as forecast_module
 from .engine import run
 from .mapping import ColumnMapping, guess_mapping, load_profile, save_profile
 from .report import write_report
@@ -44,6 +45,8 @@ def _build_parser() -> argparse.ArgumentParser:
             "      양식이 이 파일에 맞는지 검사만\n\n"
             "  python -m budget_analyzer --함수목록\n"
             "      양식 수식에서 쓸 수 있는 함수 보기\n\n"
+            "  python -m budget_analyzer 올해_현황.xlsx --전망 작년_상세.xlsx --xlsx 집행전망.xlsx\n"
+            "      작년 같은 기간의 지출 패턴으로 집행 전망 계산 (엑셀의 '가중치' 셀로 조절)\n\n"
             "  python -m budget_analyzer --gui\n"
         ),
     )
@@ -92,6 +95,8 @@ def _build_parser() -> argparse.ArgumentParser:
     output.add_argument("--xlsx", help="분석 결과를 엑셀로도 저장할 경로")
     output.add_argument("--csv-dir", help="표별 CSV 를 저장할 폴더")
     output.add_argument("--no-report", action="store_true", help="HTML 보고서를 만들지 않음")
+
+    forecast_module.add_arguments(parser)
     return parser
 
 
@@ -216,6 +221,12 @@ def main(argv: list[str] | None = None) -> int:
     if not os.path.exists(args.file):
         print(f"오류: '{args.file}' 파일을 찾을 수 없습니다.", file=sys.stderr)
         return 2
+
+    if args.forecast_history:
+        if not os.path.exists(args.forecast_history):
+            print(f"오류: '{args.forecast_history}' 파일을 찾을 수 없습니다.", file=sys.stderr)
+            return 2
+        return forecast_module.run_from_args(args)
 
     try:
         if args.list_sheets:

@@ -13,7 +13,17 @@ from typing import Sequence
 
 from .table import Table
 
-__all__ = ["write_xlsx", "write_csv"]
+__all__ = ["write_xlsx", "write_csv", "Formula"]
+
+
+class Formula(str):
+    """엑셀 수식을 담는 문자열. 값이 아니라 ``<f>`` 로 내보내진다.
+
+    선행 ``=`` 는 있어도 없어도 된다 (``Formula("=A1+B1")`` 또는 ``Formula("A1+B1")``).
+    캐시된 값은 쓰지 않으므로, 엑셀에서 열면 그때 계산된다.
+    """
+
+    __slots__ = ()
 
 
 _CONTENT_TYPES_HEAD = (
@@ -100,8 +110,15 @@ def _safe_sheet_name(name: str, used: set[str]) -> str:
 
 
 def _cell_xml(ref: str, value: object, percent_column: bool) -> str:
-    if value is None or (isinstance(value, str) and not value.strip()):
+    if value is None or (
+        isinstance(value, str) and not isinstance(value, Formula) and not value.strip()
+    ):
         return ""
+
+    if isinstance(value, Formula):
+        style = _PERCENT_STYLE if percent_column else _NUMBER_STYLE
+        text = value[1:] if value.startswith("=") else str(value)
+        return f'<c r="{ref}" s="{style}"><f>{_escape(text)}</f></c>'
 
     if isinstance(value, bool):
         return f'<c r="{ref}" t="b"><v>{1 if value else 0}</v></c>'
