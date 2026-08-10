@@ -10,6 +10,7 @@ tkinter 는 파이썬 공식 설치본에 기본 포함되므로 별도 설치�
 
 from __future__ import annotations
 
+import datetime as _dt
 import os
 import sys
 import threading
@@ -18,9 +19,10 @@ import webbrowser
 
 from . import expression
 from .engine import run
+from .forecast import ForecastError, ForecastSettings, build_forecast, end_of_quarter, write_forecast
 from .mapping import guess_mapping
 from .report import write_report
-from .table import Table, format_number, format_percent, to_number
+from .table import Table, format_number, format_percent, to_date, to_number
 from .template import (
     AGGREGATIONS,
     FORMATS,
@@ -340,6 +342,16 @@ class _App:
         self.template_desc_var = tk.StringVar()
         self.global_filter_var = tk.StringVar()
 
+        self.forecast_current_path: str | None = None
+        self.forecast_history_path: str | None = None
+        self.forecast_current_var = tk.StringVar(value="올해 집행 현황 파일을 선택하세요")
+        self.forecast_history_var = tk.StringVar(value="작년 원인행위상세 파일을 선택하세요")
+        self.forecast_base_date_var = tk.StringVar(value=_dt.date.today().isoformat())
+        self.forecast_target_date_var = tk.StringVar(value="")
+        self.forecast_weight_var = tk.StringVar(value="100")
+        self.forecast_result = None
+        self.forecast_output_path: str | None = None
+
         self.block_vars = {
             "이름": tk.StringVar(),
             "유형": tk.StringVar(value="집계"),
@@ -378,6 +390,7 @@ class _App:
         self._build_data_tab()
         self._build_template_tab()
         self._build_result_tab()
+        self._build_forecast_tab()
 
         ttk.Label(outer, textvariable=self.status_var, foreground="#555").pack(fill="x", pady=(6, 0))
 
@@ -598,6 +611,64 @@ class _App:
         self.output.configure(yscrollcommand=scroll.set, state="disabled")
         scroll.pack(side="right", fill="y")
         self.output.pack(side="left", fill="both", expand=True)
+
+    def _build_forecast_tab(self) -> None:
+        ttk = self.ttk
+        tab = ttk.Frame(self.notebook, padding=12)
+        self.notebook.add(tab, text=" 4. 집행 전망 ")
+
+        intro = ttk.Label(
+            tab,
+            foreground="#555",
+            wraplength=880,
+            justify="left",
+            text=(
+                "작년 같은 기간에 얼마나 더 지출됐는지를 목/세목 단위로 구해, 올해 목표일까지의 "
+                "집행 전망을 추정합니다. 아래 두 파일을 고르고 [집행 전망 계산]을 누르면 결과 엑셀이 "
+                "만들어집니다 — 그 엑셀의 '설정' 시트에서 가중치(%)를 바꾸면 전망이 다시 계산됩니다."
+            ),
+        )
+        intro.pack(fill="x", pady=(0, 12))
+
+        files = ttk.Frame(tab)
+        files.pack(fill="x")
+        ttk.Button(files, text="올해 집행 현황 파일…", command=self._choose_forecast_current, width=20).grid(
+            row=0, column=0, sticky="w", pady=3
+        )
+        ttk.Label(files, textvariable=self.forecast_current_var, foreground="#444").grid(
+            row=0, column=1, sticky="w", padx=10
+        )
+        ttk.Button(files, text="작년 원인행위상세 파일…", command=self._choose_forecast_history, width=20).grid(
+            row=1, column=0, sticky="w", pady=3
+        )
+        ttk.Label(files, textvariable=self.forecast_history_var, foreground="#444").grid(
+            row=1, column=1, sticky="w", padx=10
+        )
+
+        settings = ttk.Frame(tab)
+        settings.pack(fill="x", pady=(10, 0))
+        ttk.Label(settings, text="기준일").pack(side="left")
+        ttk.Entry(settings, textvariable=self.forecast_base_date_var, width=12).pack(side="left", padx=(4, 16))
+        ttk.Label(settings, text="목표일 (비우면 분기 말)").pack(side="left")
+        ttk.Entry(settings, textvariable=self.forecast_target_date_var, width=12).pack(side="left", padx=(4, 16))
+        ttk.Label(settings, text="가중치(%)").pack(side="left")
+        ttk.Entry(settings, textvariable=self.forecast_weight_var, width=6).pack(side="left", padx=4)
+
+        actions = ttk.Frame(tab)
+        actions.pack(fill="x", pady=10)
+        self.forecast_run_button = ttk.Button(
+            actions, text="집행 전망 계산…", command=self._run_forecast, width=16
+        )
+        self.forecast_run_button.pack(side="left")
+        ttk.Button(actions, text="결과 엑셀 열기", command=self._open_forecast_output).pack(side="left", padx=5)
+
+        frame = ttk.LabelFrame(tab, text=" 결과 ", padding=8)
+        frame.pack(fill="both", expand=True)
+        self.forecast_output = self.tk.Text(frame, wrap="word", relief="flat", background="#fbfbfa")
+        scroll = ttk.Scrollbar(frame, command=self.forecast_output.yview)
+        self.forecast_output.configure(yscrollcommand=scroll.set, state="disabled")
+        scroll.pack(side="right", fill="y")
+        self.forecast_output.pack(side="left", fill="both", expand=True)
 
     # ── 데이터 ──────────────────────────────────────────────────
 
@@ -1020,6 +1091,107 @@ class _App:
         for table in self.result.tables():
             write_csv(os.path.join(folder, f"{table.name or 'sheet'}.csv"), table)
         self.status_var.set(f"CSV 저장 완료: {folder}")
+
+    # ── 집행 전망 ───────────────────────────────────────────────
+
+    def _choose_forecast_current(self) -> None:
+        path = self.filedialog.askopenfilename(title="올해 집행 현황 파일 선택", filetypes=_FILE_TYPES)
+        if path:
+            self.forecast_current_path = path
+            self.forecast_current_var.set(os.path.basename(path))
+
+    def _choose_forecast_history(self) -> None:
+        path = self.filedialog.askopenfilename(title="작년 원인행위상세 파일 선택", filetypes=_FILE_TYPES)
+        if path:
+            self.forecast_history_path = path
+            self.forecast_history_var.set(os.path.basename(path))
+
+    def _run_forecast(self) -> None:
+        if not self.forecast_current_path or not self.forecast_history_path:
+            self.messagebox.showinfo("파일 필요", "올해 집행 현황 파일과 작년 원인행위상세 파일을 모두 선택하세요.")
+            return
+
+        base_date = to_date(self.forecast_base_date_var.get().strip())
+        if base_date is None:
+            self.messagebox.showwarning("입력 확인", "기준일을 이해하지 못했습니다 (예: 2026-08-10).")
+            return
+
+        target_text = self.forecast_target_date_var.get().strip()
+        target_date = to_date(target_text) if target_text else end_of_quarter(base_date)
+        if target_date is None:
+            self.messagebox.showwarning("입력 확인", "목표일을 이해하지 못했습니다 (예: 2026-09-30).")
+            return
+
+        try:
+            weight = float(self.forecast_weight_var.get().strip() or "100")
+        except ValueError:
+            self.messagebox.showwarning("입력 확인", "가중치(%)는 숫자여야 합니다.")
+            return
+
+        out_path = self.filedialog.asksaveasfilename(
+            title="집행 전망 엑셀 저장",
+            defaultextension=".xlsx",
+            filetypes=[("엑셀 파일", "*.xlsx")],
+            initialfile=os.path.splitext(os.path.basename(self.forecast_current_path))[0] + "_집행전망.xlsx",
+        )
+        if not out_path:
+            return
+
+        self.forecast_run_button.state(["disabled"])
+        self.status_var.set("집행 전망 계산 중…")
+
+        def work() -> None:
+            try:
+                current = read_table(self.forecast_current_path)
+                history = read_table(self.forecast_history_path)
+                settings = ForecastSettings(base_date=base_date, target_date=target_date, weight_percent=weight)
+                result = build_forecast(history, current, settings)
+                write_forecast(out_path, result)
+            except (SpreadsheetError, ForecastError) as error:
+                self.root.after(0, lambda: self._forecast_failed(str(error)))
+                return
+            except Exception:  # 사용자에게 스택을 그대로 보여주는 편이 낫다.
+                message = traceback.format_exc()
+                self.root.after(0, lambda: self._forecast_failed(message))
+                return
+            self.root.after(0, lambda: self._forecast_succeeded(result, out_path))
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _forecast_failed(self, message: str) -> None:
+        self.forecast_run_button.state(["!disabled"])
+        self.status_var.set("집행 전망 계산 실패")
+        self._write(self.forecast_output, "계산 중 오류가 발생했습니다.\n\n" + message)
+
+    def _forecast_succeeded(self, result, out_path: str) -> None:
+        self.forecast_result = result
+        self.forecast_output_path = out_path
+        self.forecast_run_button.state(["!disabled"])
+        self.status_var.set(f"완료 — 집행 전망 엑셀: {out_path}")
+
+        settings = result.settings
+        lines = [
+            f"기준일 {settings.base_date} → 목표일 {settings.target_date}",
+            f"(작년 {settings.history_base_date + _dt.timedelta(days=1)} ~ {settings.history_target_date} 패턴 사용, 가중치 {settings.weight_percent:.0f}%)",
+            "",
+            f"목/세목 매칭: {result.matched_rows}행 매칭, {result.unmatched_rows}행은 전체 평균으로 대체",
+        ]
+        for warning in result.warnings:
+            lines.append(f"  · {warning}")
+        lines += ["", f"저장 위치: {out_path}", "", "엑셀을 열어 '설정' 시트의 가중치(%) 값을 바꾸면 전망이 다시 계산됩니다."]
+        self._write(self.forecast_output, "\n".join(lines))
+        self._open_forecast_output()
+
+    def _open_forecast_output(self) -> None:
+        if not self.forecast_output_path or not os.path.exists(self.forecast_output_path):
+            self.messagebox.showinfo("결과 없음", "먼저 [집행 전망 계산]을 실행하세요.")
+            return
+        try:
+            os.startfile(self.forecast_output_path)  # type: ignore[attr-defined]
+        except AttributeError:
+            webbrowser.open(f"file:///{os.path.abspath(self.forecast_output_path).replace(os.sep, '/')}")
+        except OSError as error:
+            self.messagebox.showwarning("열기 실패", f"{error}\n\n파일 위치: {self.forecast_output_path}")
 
     def run(self) -> None:
         self.root.mainloop()
