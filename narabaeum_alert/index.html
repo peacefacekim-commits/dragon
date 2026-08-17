@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#2563eb" />
+<title>나라배움터 수강완료 알림</title>
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+<link rel="apple-touch-icon" href="icons/icon.svg" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<header>
+  <h1>⏰ 나라배움터 수강완료 알림</h1>
+  <p>교육 화면을 사진으로 찍으면 남은 시간을 인식해서, 다 되면 알려드려요.</p>
+</header>
+
+<main>
+  <div class="perm-banner" id="perm-banner">
+    알림을 받으려면 알림 권한이 필요해요.
+    <div class="row" style="margin-top:8px">
+      <button id="btn-request-perm">알림 허용하기</button>
+    </div>
+  </div>
+
+  <section class="card">
+    <h2>새 타이머 추가</h2>
+
+    <label for="course-label">과정 이름 (선택)</label>
+    <input type="text" id="course-label" placeholder="예: 정보보안 기본교육" />
+
+    <div class="row" style="margin-top:12px">
+      <button id="btn-camera">📷 사진으로 시간 인식</button>
+      <input type="file" id="camera-input" accept="image/*" capture="environment" />
+      <button id="btn-manual-toggle" class="secondary">✏️ 직접 입력</button>
+    </div>
+
+    <div id="manual-inputs" style="display:none; margin-top:12px">
+      <div class="row">
+        <div class="field">
+          <label for="manual-hours">시간</label>
+          <input type="number" id="manual-hours" min="0" max="23" value="0" />
+        </div>
+        <div class="field">
+          <label for="manual-minutes">분</label>
+          <input type="number" id="manual-minutes" min="0" max="59" value="0" />
+        </div>
+      </div>
+    </div>
+
+    <img id="ocr-preview" class="ocr-preview" alt="촬영한 사진 미리보기" />
+    <div id="ocr-status" class="ocr-status"></div>
+    <div id="ocr-candidates" class="candidates"></div>
+
+    <div class="row" style="margin-top:14px">
+      <button id="btn-start" disabled>▶ 이 시간으로 타이머 시작</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>진행 중인 타이머</h2>
+    <div id="timer-list"></div>
+    <div id="timer-empty" class="empty">등록된 타이머가 없어요.</div>
+  </section>
+
+  <section class="card">
+    <p class="note">
+      ⚠️ 이 앱은 사진 속 글자를 인식해 예상 시간을 계산할 뿐이라, 실제 나라배움터 진도와 100% 일치하지 않을 수 있어요.
+      인식된 시간은 꼭 확인하고 필요하면 직접 수정한 뒤 시작하세요.<br /><br />
+      ⚠️ 브라우저(또는 앱)를 완전히 종료하면 휴대폰 운영체제 정책상 알림이 늦게 오거나 안 올 수 있어요.
+      되도록 앱을 백그라운드로만 두고(완전 종료 X), 학습이 끝날 시간쯤 앱을 한 번씩 열어 확인하는 걸 추천해요.
+      사진은 서버로 전송되지 않고 이 기기 안에서만 처리돼요.
+    </p>
+  </section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

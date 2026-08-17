@@ -1,0 +1,225 @@
+:root {
+  --bg: #0f172a;
+  --card: #1e293b;
+  --accent: #2563eb;
+  --accent-2: #22c55e;
+  --text: #e2e8f0;
+  --muted: #94a3b8;
+  --danger: #ef4444;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0 0 40px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+}
+
+header {
+  padding: 20px 16px 12px;
+  text-align: center;
+}
+
+header h1 {
+  font-size: 1.25rem;
+  margin: 0 0 4px;
+}
+
+header p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+main {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+.card {
+  background: var(--card);
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.card h2 {
+  font-size: 1rem;
+  margin: 0 0 12px;
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+button {
+  font: inherit;
+  border: none;
+  border-radius: 10px;
+  padding: 12px 16px;
+  cursor: pointer;
+  background: var(--accent);
+  color: white;
+  font-weight: 600;
+}
+
+button.secondary {
+  background: #334155;
+}
+
+button.danger {
+  background: var(--danger);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+input[type="text"],
+input[type="number"] {
+  font: inherit;
+  background: #0b1220;
+  border: 1px solid #334155;
+  color: var(--text);
+  border-radius: 8px;
+  padding: 10px;
+  width: 100%;
+}
+
+label {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.field {
+  flex: 1;
+  min-width: 90px;
+}
+
+#camera-input {
+  display: none;
+}
+
+.ocr-status {
+  margin-top: 10px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.ocr-preview {
+  margin-top: 10px;
+  max-width: 100%;
+  border-radius: 10px;
+  display: none;
+}
+
+.candidates {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.candidates button {
+  background: #334155;
+  font-weight: 500;
+  font-size: 0.85rem;
+  padding: 8px 12px;
+}
+
+.candidates button.selected {
+  background: var(--accent);
+}
+
+.timer-item {
+  background: #0b1220;
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 10px;
+  border: 1px solid #1e293b;
+}
+
+.timer-item.done {
+  border-color: var(--accent-2);
+}
+
+.timer-item .label {
+  font-size: 0.85rem;
+  color: var(--muted);
+  display: flex;
+  justify-content: space-between;
+}
+
+.timer-item .remaining {
+  font-size: 1.6rem;
+  font-weight: 700;
+  margin: 6px 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.timer-item.done .remaining {
+  color: var(--accent-2);
+}
+
+.progress-bar {
+  height: 6px;
+  background: #1e293b;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progress-bar > div {
+  height: 100%;
+  background: var(--accent);
+}
+
+.timer-item.done .progress-bar > div {
+  background: var(--accent-2);
+}
+
+.timer-actions {
+  margin-top: 10px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.timer-actions button {
+  padding: 6px 12px;
+  font-size: 0.8rem;
+}
+
+.empty {
+  color: var(--muted);
+  font-size: 0.85rem;
+  text-align: center;
+  padding: 12px 0;
+}
+
+.note {
+  font-size: 0.78rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.perm-banner {
+  background: #422006;
+  border: 1px solid #92400e;
+  color: #fdba74;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 0.82rem;
+  margin-bottom: 16px;
+  display: none;
+}

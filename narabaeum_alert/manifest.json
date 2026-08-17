@@ -1,0 +1,19 @@
+{
+  "name": "나라배움터 수강완료 알림",
+  "short_name": "배움터알림",
+  "description": "교육 화면을 사진으로 찍으면 남은 시간을 인식해 타이머를 돌리고, 수강이 끝나면 알림을 보내줍니다.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#2563eb",
+  "lang": "ko",
+  "icons": [
+    {
+      "src": "icons/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
