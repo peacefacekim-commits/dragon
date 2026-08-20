@@ -16,7 +16,7 @@ from playwright.sync_api import Locator, Page, TimeoutError as PlaywrightTimeout
 DEFAULT_CONFIG = {
     "start_url": "",
     "profile_dir": "./chrome_profile",
-    "poll_seconds": 5,
+    "poll_seconds": 1800,
     "completion_texts": [],
     "completion_selectors": [],
     "next_lecture_selector": "",
@@ -96,7 +96,11 @@ def advance_to_next_lecture(page: Page, cfg: dict) -> bool:
 
 def watch(page: Page, cfg: dict) -> None:
     handled_urls = set()
-    print("모니터링을 시작합니다. 종료하려면 Ctrl+C 를 누르세요.\n")
+    interval_min = cfg["poll_seconds"] / 60
+    print(
+        f"모니터링을 시작합니다 — 지금 바로 한 번 확인하고, "
+        f"이후 {interval_min:g}분마다 확인합니다. 종료하려면 Ctrl+C 를 누르세요.\n"
+    )
 
     while True:
         try:

@@ -28,7 +28,7 @@ python -m playwright install chromium
 {
   "start_url": "https://www.nlc.go.kr/",
   "profile_dir": "./chrome_profile",
-  "poll_seconds": 5,
+  "poll_seconds": 1800,
   "completion_texts": ["수강완료", "학습완료", "이수완료"],
   "completion_selectors": [],
   "next_lecture_selector": "여기에 CSS 셀렉터",
@@ -40,7 +40,7 @@ python -m playwright install chromium
 | 항목 | 설명 |
 |---|---|
 | `start_url` | 실행 시 처음 열 주소 (로그인 페이지나 과목 목록 페이지) |
-| `poll_seconds` | 완료 여부를 몇 초마다 확인할지 |
+| `poll_seconds` | 완료 여부를 몇 초마다 확인할지 (기본값 1800 = 시작하자마자 한 번, 이후 30분마다) |
 | `completion_texts` | 이 중 하나라도 화면 텍스트에 있으면 "완료"로 판단 |
 | `completion_selectors` | (선택) 완료 시 나타나는 특정 요소의 CSS 셀렉터 |
 | `next_lecture_selector` | **필수.** "다음 강의" 버튼/링크의 CSS 셀렉터 |

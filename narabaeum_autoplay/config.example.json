@@ -5,7 +5,7 @@
 
   "profile_dir": "./chrome_profile",
 
-  "poll_seconds": 5,
+  "poll_seconds": 1800,
 
   "completion_texts": [
     "수강완료",
