@@ -15,7 +15,18 @@
   실행하면 됩니다. 이건 우연이 아니라 이 도구가 갖고 있는 유일한 안전장치라서,
   코드를 고쳐서 이 부분을 우회하는 용도로 쓰지 마세요.
 
-## 준비
+## 준비 (Windows, 더블클릭으로)
+
+1. **`설치.bat`** 을 더블클릭합니다. (처음 한 번만) 필요한 패키지와 브라우저를
+   설치하고, `config.json` 이 없으면 `config.example.json` 을 복사해 만들어줍니다.
+2. 메모장으로 `config.json` 을 열어 `next_lecture_selector` 등 값을 채웁니다.
+   (아래 [셀렉터 찾는 법](#셀렉터-찾는-법-next_lecture_selector-등) 참고)
+3. **`실행.bat`** 을 더블클릭하면 시작합니다.
+
+파이썬이 없다면 [python.org] 에서 설치하고, 설치 시
+**"Add python.exe to PATH"** 를 꼭 체크하세요.
+
+## 준비 (명령줄로 직접)
 
 ```bash
 pip install -r requirements.txt
@@ -62,6 +73,8 @@ python -m playwright install chromium
 
 ## 실행
 
+`실행.bat` 을 더블클릭하거나(Windows), 명령줄에서 직접 실행합니다.
+
 ```bash
 python autoplay.py
 ```
@@ -69,6 +82,8 @@ python autoplay.py
 브라우저가 뜨면 나라배움터에 로그인하고 강의 재생 화면으로 이동한 뒤, 터미널에서
 Enter 를 누르면 모니터링이 시작됩니다. 강의가 끝날 때마다 콘솔에 진행 상황이
 출력되고, 다음 강의로 자동 이동합니다. `Ctrl+C` 로 언제든 멈출 수 있습니다.
+
+[python.org]: https://www.python.org/downloads/windows/
 
 ## 시연할 때 참고
 
