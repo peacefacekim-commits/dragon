@@ -1,0 +1,23 @@
+{
+  "_설명": "이 파일을 config.json 으로 복사한 뒤, 실제 값으로 채워서 쓰세요. 셀렉터는 나라배움터에 로그인한 상태에서 브라우저 개발자도구(F12)로 직접 확인해야 합니다 — README의 '셀렉터 찾는 법'을 참고하세요.",
+
+  "start_url": "https://www.nlc.go.kr/",
+
+  "profile_dir": "./chrome_profile",
+
+  "poll_seconds": 5,
+
+  "completion_texts": [
+    "수강완료",
+    "학습완료",
+    "이수완료"
+  ],
+
+  "completion_selectors": [],
+
+  "next_lecture_selector": "",
+
+  "play_after_next_selector": "",
+
+  "wait_after_click_seconds": 3
+}
