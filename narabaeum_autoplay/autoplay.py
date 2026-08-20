@@ -22,6 +22,7 @@ DEFAULT_CONFIG = {
     "next_lecture_selector": "",
     "play_after_next_selector": "",
     "wait_after_click_seconds": 3,
+    "headless": False,
 }
 
 
@@ -129,7 +130,7 @@ def main() -> None:
 
     with sync_playwright() as playwright:
         context = playwright.chromium.launch_persistent_context(
-            str(profile_dir), headless=False, viewport=None
+            str(profile_dir), headless=cfg["headless"], viewport=None
         )
         page = context.pages[0] if context.pages else context.new_page()
         page.goto(cfg["start_url"])
