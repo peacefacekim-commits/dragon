@@ -37,7 +37,7 @@ python -m playwright install chromium
 
 ```json
 {
-  "start_url": "https://www.nlc.go.kr/",
+  "start_url": "https://e-learning.nhi.go.kr/study/main/elrnMain.do",
   "profile_dir": "./chrome_profile",
   "poll_seconds": 1800,
   "completion_texts": ["수강완료", "학습완료", "이수완료"],
