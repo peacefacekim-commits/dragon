@@ -1,0 +1,19 @@
+{
+  "start_url": "",
+
+  "profile_dir": "./demo_chrome_profile",
+
+  "poll_seconds": 5,
+
+  "completion_texts": [],
+
+  "completion_selectors": ["#status.done"],
+
+  "next_lecture_selector": "#next-btn",
+
+  "play_after_next_selector": "",
+
+  "wait_after_click_seconds": 1,
+
+  "headless": false
+}

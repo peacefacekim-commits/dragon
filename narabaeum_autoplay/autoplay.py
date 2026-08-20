@@ -35,8 +35,6 @@ def load_config(path: Path) -> dict:
     user_cfg = json.loads(path.read_text(encoding="utf-8"))
     cfg = {**DEFAULT_CONFIG, **user_cfg}
 
-    if not cfg["start_url"]:
-        sys.exit("[오류] start_url 이 비어 있습니다.")
     if not cfg["next_lecture_selector"]:
         print(
             "[경고] next_lecture_selector 가 비어 있어요. "
@@ -122,9 +120,18 @@ def watch(page: Page, cfg: dict) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", default="config.json", help="설정 파일 경로")
+    parser.add_argument(
+        "--start-file",
+        help="start_url 대신 사용할 로컬 HTML 파일 경로 (시연용 모의 강의 등)",
+    )
     args = parser.parse_args()
 
     cfg = load_config(Path(args.config))
+    if args.start_file:
+        cfg["start_url"] = Path(args.start_file).resolve().as_uri()
+    if not cfg["start_url"]:
+        sys.exit("[오류] start_url 이 비어 있습니다. config.json 을 채우거나 --start-file 을 넘겨주세요.")
+
     profile_dir = Path(cfg["profile_dir"]).resolve()
     profile_dir.mkdir(parents=True, exist_ok=True)
 
@@ -135,7 +142,7 @@ def main() -> None:
         page = context.pages[0] if context.pages else context.new_page()
         page.goto(cfg["start_url"])
 
-        print("나라배움터에 로그인한 뒤, 강의 재생 화면으로 이동해주세요.")
+        print("브라우저가 열렸습니다. (실제 사이트라면 로그인 후 강의 화면으로 이동하세요)")
         print("(로그인 정보는 이 폴더의 chrome_profile 에 저장되어 다음 실행부터는 유지됩니다.)")
         input("준비되면 이 창에서 Enter 를 눌러 모니터링을 시작합니다...")
 
