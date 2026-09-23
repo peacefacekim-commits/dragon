@@ -1,0 +1,13 @@
+{
+  "date": "20260921",
+  "timestamp": "2026-09-23T12:05:45.539123",
+  "num_stocks": 10,
+  "yesterday_signal": "bullish",
+  "yesterday_signal_strength": 0.005731036022842092,
+  "ovn": -0.0008989050317216518,
+  "predicted_return": -0.0022,
+  "predicted_confidence": 55,
+  "actual_return": null,
+  "hit_target": null,
+  "status": "waiting_for_actual"
+}
