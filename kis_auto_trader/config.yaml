@@ -1,0 +1,106 @@
+# 자동매매 설정 파일. 코드를 건드리지 않고 이 파일 숫자만 바꾸면 됩니다.
+
+account:
+  mode: real
+  total_capital: 2000000
+  cash_buffer_ratio: 0.0
+  # (2026-09-13) 실제 주문은 api_client.py 에서 주문 함수를 통째로 지워서
+  # 구조적으로 불가능하다. 이 값은 그 위에 얹는 이중 안전장치이자, 설정만 봐도
+  # "이 프로그램은 주문을 내지 않는다"가 드러나게 하려는 표시다.
+  real_trading_enabled: false
+
+strategy:
+  # (2026-09-06 확인) entry_mode ~ volume_avg_days 까지는 매일 자동으로 도는
+  # daemon.py/main.py/trader.py 경로에서는 더 이상 읽지 않는다 - 지금 자동
+  # 관찰은 factors.py의 모멘텀/추세추종/저변동성/밸류 4개 전략을 코드에 고정해
+  # 쓴다. 이 값들은 screener.py를 수동으로 직접 실행할 때만 쓰인다(예:
+  # `python screener.py --mode dip`) - 자동 파이프라인엔 영향 없다.
+  entry_mode: dip_buy
+  candidate_selection: dip
+
+  short_ma: 5
+  long_ma: 20
+
+  # (2026-08-26) 7/29~8/18 검증된 기준으로 되돌림 - 그 이후(8/21) -10.0 -> -3.0,
+  # 20일 -> 5일로 완화됐던 걸 원래대로.
+  dip_buy_pct: -10.0
+  dip_lookback_days: 20
+
+  # (2026-08-26) 7/29~8/18 기준으로 되돌림 - 8/21에 3.0 -> 1.0, 3일 -> 2일로
+  # 완화됐던 걸 원래대로.
+  rebound_confirm_pct: 3.0
+  reversal_window_days: 3
+
+  # (2026-08-26) 7/29~8/18 당시엔 이 기능 자체가 없었음(8/20 신규 추가). 0이면
+  # 거래량 확인 없이 가격 조건만 봄 - 그때와 동일하게.
+  volume_multiplier: 0
+  volume_avg_days: 5
+
+  # (2026-09-13 추가) 주가가 이 금액 미만인 종목은 후보에서 뺀다.
+  # 실거래 79건을 뜯어봤을 때 손실이 저가주에 몰려 있어서 5,000원으로 하기로
+  # 했는데(2026-09-03), 코드(common.min_stock_price / screener._filter_affordable)
+  # 에만 들어가고 이 파일에 줄이 안 들어가 있었다. 기본값이 0이라 그동안 이
+  # 필터는 꺼진 채로 돌고 있었다.
+  min_stock_price: 5000
+
+risk:
+  stop_loss_pct: -4.0
+  stop_loss_amount: 16000
+
+  take_profit_pct: 3.5
+  take_profit_amount: 16000
+
+  max_positions: 5
+
+  daily_loss_limit_pct: 5.0
+  # (2026-09-03 추가) 오늘 실현손실이 이 금액(원)을 넘으면 신규 매수 중단 -
+  # 평소(전날 코스닥 플러스인 날) 기준.
+  daily_loss_limit_amount: 100000
+  # (2026-09-03 추가) 전날 코스닥이 마이너스인 날은 위 대신 이 값을 손실한도로 씀.
+  daily_loss_limit_amount_kosdaq_negative: 10000
+
+market_adaptive:
+  enabled: true
+  index_code: "0001"
+  trend_ma_days: 20
+
+  max_adjust_days: 5
+  bull_tp_per_day: 0.1
+  bull_sl_per_day: -0.1
+  bear_tp_per_day: -0.1
+  bear_sl_per_day: 0.1
+
+  use_relative_stop_loss: true
+
+fees:
+  buy_fee_pct: 0.015
+  sell_fee_pct: 0.015
+  sell_tax_pct: 0.18
+
+# (2026-09-13 추가) 고정 유니버스 + 일봉 패널 설정.
+# 매일 같은 종목을 봐야 데이터가 쌓인다 - universe.py / panel.py 참고.
+universe:
+  # 목표 종목 수. 순위 API가 하루에 주는 종목이 한정적이라 며칠에 걸쳐 채워지고,
+  # 다 차면 그 뒤로는 바뀌지 않는다.
+  size: 200
+  # 일봉을 언제부터 받아올지. 과거치는 지금 당장 받을 수 있으므로 기다릴 필요가
+  # 없다. 길수록 좋지만 첫 수집 시간이 늘어난다
+  # (200종목 x 5년 = 대략 12,000번 호출, 초당 8건 제한이라 25분 안팎).
+  panel_start_date: "20210101"
+
+watchlist:
+  - code: "007460"
+    name: "에이프로젠"
+    invest_ratio: 0.2
+  - code: "003060"
+    name: "에이프로젠바이오로직스"
+    invest_ratio: 0.2
+  - code: "417030"
+    name: "니어스랩"
+    invest_ratio: 0.2
+  - code: "127120"
+    name: "제이에스링크"
+    invest_ratio: 0.2
+  - code: "115180"
+    name: "큐리언트"
+    invest_ratio: 0.2
