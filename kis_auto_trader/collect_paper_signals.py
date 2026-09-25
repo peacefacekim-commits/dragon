@@ -10,6 +10,7 @@ import csv
 from datetime import datetime
 from pathlib import Path
 import statistics as st
+import holidays
 
 import strategy as S
 
@@ -252,11 +253,30 @@ def print_summary(signal_record):
     print(f"\n상태: {signal_record['status']}")
 
 
+def is_trading_day():
+    """한국 거래일 확인 (평일 + 공휴일 아님)."""
+    today = datetime.now().date()
+    kr_holidays = holidays.SouthKorea(years=today.year)
+
+    # 토/일 또는 공휴일이면 False
+    if today.weekday() >= 5:  # 토(5), 일(6)
+        return False
+    if today in kr_holidays:
+        return False
+
+    return True
+
+
 def main():
     print("\n" + "=" * 80)
     print("종이거래 신호 수집 (Paper Trading)")
     print("=" * 80)
     print(f"실행 시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+
+    # 거래일 확인
+    if not is_trading_day():
+        print("⏸️  오늘은 거래 휴장일입니다 (주말 또는 공휴일)")
+        return 0
 
     # 1. 데이터 로드
     print("[1] 데이터 로드...")
