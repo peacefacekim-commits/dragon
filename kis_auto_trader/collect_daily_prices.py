@@ -75,10 +75,47 @@ def get_daily_price(cfg, code: str, date: str = None) -> dict | None:
         return None
 
 
+def validate_csv_integrity(csv_path: Path) -> bool:
+    """CSV 파일 무결성 검증"""
+    if not csv_path.exists():
+        return False
+
+    try:
+        with open(csv_path, 'r', encoding='utf-8-sig') as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+
+        if not rows:
+            return False
+
+        # 헤더 검증
+        required_fields = ['date', 'code', 'open', 'close', 'high', 'low', 'volume']
+        if reader.fieldnames is None or not all(f in reader.fieldnames for f in required_fields):
+            print(f"  ✗ CSV 헤더 오류: {reader.fieldnames}")
+            return False
+
+        # 마지막 행 데이터 검증
+        last_row = rows[-1]
+        if not last_row.get('date') or len(last_row['date']) != 8:
+            print(f"  ✗ 날짜 형식 오류: {last_row.get('date')}")
+            return False
+
+        return True
+    except Exception as e:
+        print(f"  ✗ CSV 검증 실패: {e}")
+        return False
+
 def collect_and_append_prices():
     """KIS API로 최신 시세를 받아 krx_panel에 추가."""
     cfg = SimpleConfig()
     dates, panel = S.load_panel(verbose=False)
+
+    # CSV 무결성 검증 추가
+    csv_path = Path(S.DATA_DIR) / f"{S.PANEL_PREFIX}_2026.csv"
+    if not validate_csv_integrity(csv_path):
+        print(f"  ✗ CSV 파일이 손상되었습니다: {csv_path}")
+        print(f"  파일을 확인하거나 백업에서 복구해주세요.")
+        return
 
     last_date = dates[-1]
     last_year = int(last_date[:4])
