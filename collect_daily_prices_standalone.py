@@ -1,7 +1,8 @@
 """KIS API를 통한 일일 주가 데이터 수집 (로컬 독립형)
 
 실행: python collect_daily_prices_standalone.py
-- 환경 변수: KIS_APP_KEY, KIS_APP_SECRET, KIS_BASE_URL (from .env)
+- 환경 변수: KIS_REAL_APP_KEY, KIS_REAL_APP_SECRET, KIS_BASE_URL (from .env)
+- 또는: KIS_APP_KEY, KIS_APP_SECRET (모의투자용)
 - 수집 대상: 명시한 종목 코드 리스트
 """
 import csv
@@ -24,12 +25,12 @@ load_dotenv()
 class KisConfig:
     """KIS API 호출용 설정."""
     def __init__(self):
-        self.app_key = os.getenv("KIS_APP_KEY")
-        self.app_secret = os.getenv("KIS_APP_SECRET")
+        self.app_key = os.getenv("KIS_REAL_APP_KEY") or os.getenv("KIS_APP_KEY")
+        self.app_secret = os.getenv("KIS_REAL_APP_SECRET") or os.getenv("KIS_APP_SECRET")
         self.base_url = os.getenv("KIS_BASE_URL", "https://openapi.koreainvestment.com:9443")
 
         if not self.app_key or not self.app_secret:
-            raise ValueError("❌ KIS_APP_KEY, KIS_APP_SECRET이 .env에 설정되지 않음")
+            raise ValueError("❌ .env에 다음이 필요합니다: KIS_REAL_APP_KEY + KIS_REAL_APP_SECRET (또는 KIS_APP_KEY + KIS_APP_SECRET)")
 
 
 def get_access_token(cfg: KisConfig) -> Optional[str]:
