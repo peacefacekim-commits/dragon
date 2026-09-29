@@ -70,6 +70,8 @@ def get_daily_price(cfg: KisConfig, token: str, code: str) -> Optional[dict]:
     params = {
         "fid_cond_mrkt_div_code": "J",
         "fid_input_iscd": code,
+        "fid_input_date_1": "20000101",
+        "fid_input_date_2": "20991231",
         "fid_org_adj_prc": "0",
         "fid_period_div_code": "D",
     }
