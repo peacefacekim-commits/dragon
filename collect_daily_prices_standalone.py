@@ -84,10 +84,14 @@ def get_daily_price(cfg: KisConfig, token: str, code: str) -> Optional[dict]:
         data = res.json()
 
         if data.get("rt_cd") != "0":
+            msg = data.get("msg", "알 수 없는 오류")
+            print(f"  ✗ {code}: API 오류 [{data.get('rt_cd')}] {msg}")
+            print(f"     응답: {json.dumps(data, ensure_ascii=False)[:300]}")
             return None
 
         items = data.get("output", [])
         if not items:
+            print(f"    [DEBUG] {code}: 데이터 없음")
             return None
 
         latest = items[0]  # 최신부터 내림차순
@@ -100,7 +104,7 @@ def get_daily_price(cfg: KisConfig, token: str, code: str) -> Optional[dict]:
             'volume': int(latest.get('cntg_vol', 0)),
         }
     except Exception as e:
-        print(f"  ✗ {code}: {e}")
+        print(f"  ✗ {code}: {type(e).__name__}: {str(e)[:200]}")
         return None
 
 
