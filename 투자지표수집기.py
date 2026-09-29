@@ -75,11 +75,12 @@ def get_daily_price(cfg: KisConfig, token: str, code: str) -> Optional[dict]:
         if data.get("rt_cd") != "0":
             msg = data.get("msg1", data.get("msg", "알 수 없는 오류"))
             print(f"  ✗ {code}: API 오류 [{data.get('rt_cd')}] {msg}")
+            print(f"     전체 응답: {json.dumps(data, ensure_ascii=False)[:500]}")
             return None
 
         items = data.get("output", [])
         if not items:
-            print(f"  ✗ {code}: 데이터 없음")
+            print(f"  ✗ {code}: 데이터 없음 (output 비어있음)")
             return None
 
         latest = items[0]
@@ -92,7 +93,7 @@ def get_daily_price(cfg: KisConfig, token: str, code: str) -> Optional[dict]:
             'volume': int(latest.get('cntg_vol', 0)),
         }
     except Exception as e:
-        print(f"  ✗ {code}: {type(e).__name__}: {str(e)[:200]}")
+        print(f"  ✗ {code}: 예외 발생 - {type(e).__name__}: {str(e)[:300]}")
         return None
 
 
@@ -141,7 +142,6 @@ def collect_indicators(codes: list, output_dir: Optional[Path] = None):
             print(f"  ✓ {code}: {price['date']} (종가: {price['close']:,}원)")
         else:
             failed.append(code)
-            print(f"  ✗ {code}: 실패")
 
         if i % 50 == 0:
             print(f"  → [{i}/{len(codes)}] 진행 중...")
