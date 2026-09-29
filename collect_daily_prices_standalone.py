@@ -37,10 +37,6 @@ def get_access_token(cfg: KisConfig) -> Optional[str]:
     """KIS API 접근 토큰 획득."""
     url = f"{cfg.base_url}/oauth2/tokenP"
 
-    headers = {
-        "content-type": "application/json",
-    }
-
     body = {
         "grant_type": "client_credentials",
         "appkey": cfg.app_key,
@@ -48,7 +44,7 @@ def get_access_token(cfg: KisConfig) -> Optional[str]:
     }
 
     try:
-        res = requests.post(url, headers=headers, json=body, timeout=10, verify=False)
+        res = requests.post(url, json=body, timeout=10)
         res.raise_for_status()
         data = res.json()
 
@@ -79,7 +75,7 @@ def get_daily_price(cfg: KisConfig, token: str, code: str) -> Optional[dict]:
     }
 
     try:
-        res = requests.get(url, headers=headers, params=params, timeout=10, verify=False)
+        res = requests.get(url, headers=headers, params=params, timeout=10)
         res.raise_for_status()
         data = res.json()
 
