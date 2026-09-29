@@ -72,10 +72,11 @@ def get_daily_price(cfg: KisConfig, token: str, code: str) -> Optional[dict]:
         res.raise_for_status()
         data = res.json()
 
+        print(f"  [DEBUG] {code}: 전체 응답 = {json.dumps(data, ensure_ascii=False)[:800]}")
+
         if data.get("rt_cd") != "0":
             msg = data.get("msg1", data.get("msg", "알 수 없는 오류"))
             print(f"  ✗ {code}: API 오류 [{data.get('rt_cd')}] {msg}")
-            print(f"     전체 응답: {json.dumps(data, ensure_ascii=False)[:500]}")
             return None
 
         items = data.get("output", [])
